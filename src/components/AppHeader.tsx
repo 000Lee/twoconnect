@@ -1,8 +1,25 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 
 export default function AppHeader() {
+   const [nickname, setNickname] = useState<string | null>(null)
+
+   useEffect(() => {
+      // localStorage에서 닉네임 확인
+      const savedNickname = localStorage.getItem('user_nickname')
+      if (savedNickname) {
+         setNickname(savedNickname)
+      }
+   }, [])
+
+   const handleLogout = () => {
+      localStorage.removeItem('user_nickname')
+      setNickname(null)
+      window.location.href = '/'
+   }
+
    return (
       <HeaderWrap>
          <TopBar>
@@ -11,8 +28,17 @@ export default function AppHeader() {
                   TwoConnect<span>2</span>
                </TopLeft>
 
-               <TopRight as="a" href="/login" style={{ fontSize: '14px', fontWeight: '400', color: 'black', cursor: 'pointer' }}>
-                  로그인
+               <TopRight>
+                  {nickname ? (
+                     <UserSection>
+                        <UserNickname>{nickname}님</UserNickname>
+                        <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
+                     </UserSection>
+                  ) : (
+                     <LoginLink as="a" href="/login" style={{ fontSize: '14px', fontWeight: '400', color: 'black', cursor: 'pointer' }}>
+                        로그인
+                     </LoginLink>
+                  )}
                </TopRight>
             </TopBarInner>
          </TopBar>
@@ -57,3 +83,36 @@ const TopLeft = styled.div`
 `
 
 const TopRight = styled.div``
+
+const UserSection = styled.div`
+   display: flex;
+   align-items: center;
+   gap: 12px;
+`
+
+const UserNickname = styled.span`
+   font-size: 14px;
+   font-weight: 500;
+   color: #333;
+`
+
+const LoginLink = styled.a`
+   font-size: 14px;
+   font-weight: 400;
+   color: black;
+   cursor: pointer;
+   text-decoration: none;
+`
+
+const LogoutButton = styled.button`
+   background: none;
+   border: none;
+   font-size: 12px;
+   color: #666;
+   cursor: pointer;
+   text-decoration: underline;
+   
+   &:hover {
+      color: #333;
+   }
+`

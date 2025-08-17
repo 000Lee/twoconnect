@@ -1,12 +1,352 @@
 'use client'
+import React, { useState, useEffect } from 'react'
 import styled from 'styled-components'
+import PostModal from '@/components/PostModal'
+import FriendAddModal from '../components/FriendAddModal'
 
-const IMG_CARD_1 = 'https://picsum.photos/seed/card1/800/480'
-const IMG_CARD_2 = 'https://picsum.photos/seed/card2/800/480'
+// 색상 순서 정의 (최대 11명까지)
+const CONNECTION_COLORS = [
+  '#FFCDB8', '#FFE9C0', '#E5FFBC', '#D3FFEA', '#D3DFFF', 
+  '#E7DDFF', '#FFD9EE', '#EAD2A4', '#C3E38F', '#A6E8C8'
+]
 
 export default function Home() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isFriendModalOpen, setIsFriendModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [editingPost, setEditingPost] = useState<{
+    id: number
+    content: string
+    imageUrl: string
+  } | null>(null)
+  const [posts, setPosts] = useState<Array<{
+    id: number
+    title: string
+    content: string
+    imageUrl: string
+    date: string
+    time: string
+  }>>([])
+  const [connections, setConnections] = useState<Array<{
+    connection_id: number
+    friend_id: string
+    friend_nickname: string
+    connection_status: string
+    created_at: string
+  }>>([])
+  const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
+  const [userNickname, setUserNickname] = useState<string>('로그인')
+  const [userId, setUserId] = useState<string>('anonymous')
+
+  // fetchPosts 함수 정의
+  const fetchPosts = async () => {
+    try {
+      const response = await fetch('/api/posts')
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('받아온 포스트 데이터:', result.posts)
+        
+        // 데이터베이스 형식을 프론트엔드 형식으로 변환
+        const formattedPosts = result.posts.map((post: any) => {
+          console.log('포스트 이미지 URL:', post.image_url)
+          
+          return {
+            id: post.id,
+            title: post.nickname,
+            content: post.content,
+            imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+            date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+            time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+          }
+        })
+        
+        console.log('변환된 포스트:', formattedPosts)
+        setPosts(formattedPosts)
+      }
+    } catch (error) {
+      console.error('포스트 조회 오류:', error)
+    }
+  }
+
+  // 컴포넌트 마운트 시 localStorage에서 사용자 정보 가져오기
+  useEffect(() => {
+    const nickname = localStorage.getItem('user_nickname') || '로그인'
+    const id = localStorage.getItem('user_id') || 'anonymous'
+    setUserNickname(nickname)
+    setUserId(id)
+    
+    fetchPosts()
+    fetchConnections()
+  }, [])
+
+  const fetchConnections = async () => {
+    try {
+      const response = await fetch(`/api/connections?userId=${userId}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('연결된 친구들:', result.connections)
+        setConnections(result.connections)
+      }
+    } catch (error) {
+      console.error('친구 연결 조회 오류:', error)
+    }
+  }
+
+  const handleFriendSelect = (friendId: string | null) => {
+    setSelectedFriend(friendId)
+    // 선택된 친구와의 피드 로드
+    if (friendId) {
+      fetchFriendPosts(friendId)
+    } else {
+      fetchPosts() // 전체 피드로 돌아가기
+    }
+  }
+
+  const fetchFriendPosts = async (friendId: string) => {
+    try {
+      const response = await fetch(`/api/posts?friendId=${friendId}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        const formattedPosts = result.posts.map((post: any) => ({
+          id: post.id,
+          title: post.nickname,
+          content: post.content,
+          imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+          date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        }))
+        setPosts(formattedPosts)
+      }
+    } catch (error) {
+      console.error('친구 피드 조회 오류:', error)
+    }
+  }
+
+  const handleCreatePost = async (postData: { content: string; imageFile: File | null }) => {
+    try {
+      console.log('=== 포스트 생성 시작 ===')
+      console.log('받은 postData:', postData)
+      
+      // state에서 사용자 정보 가져오기
+      console.log('사용자 정보:', { userNickname, userId })
+      
+      // 이미지 파일을 Base64로 변환
+      let imageData = null
+      if (postData.imageFile) {
+        console.log('이미지 파일 처리 시작:', postData.imageFile.name)
+        const reader = new FileReader()
+        imageData = await new Promise((resolve) => {
+          reader.onload = (e) => {
+            const result = e.target?.result as string
+            console.log('Base64 변환 완료, 길이:', result.length)
+            resolve({
+              name: postData.imageFile!.name,
+              type: postData.imageFile!.type,
+              size: postData.imageFile!.size,
+              data: result
+            })
+          }
+          reader.onerror = (error) => {
+            console.error('FileReader 오류:', error)
+            resolve(null)
+          }
+          reader.readAsDataURL(postData.imageFile!)
+        })
+        console.log('이미지 데이터 준비 완료:', !!imageData)
+      } else {
+        console.log('이미지 파일 없음')
+      }
+      
+      // API 호출하여 데이터베이스에 저장
+      const requestBody = {
+        content: postData.content,
+        imageFile: imageData
+      }
+      console.log('API 요청 본문:', requestBody)
+      
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-nickname': userNickname,
+          'x-user-id': userId
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      const result = await response.json()
+      console.log('API 응답:', result)
+      
+      if (result.success) {
+        console.log('포스트 생성 성공!')
+        // 성공 시 포스트 목록 새로고침
+        fetchPosts()
+      } else {
+        console.error('포스트 생성 실패:', result.error)
+      }
+    } catch (error) {
+      console.error('포스트 생성 오류:', error)
+    }
+  }
+
+  const handleUpdatePost = async (id: number, postData: { content: string; imageFile: File | null }) => {
+    try {
+      console.log('=== 포스트 수정 시작 ===')
+      console.log('수정할 포스트 ID:', id)
+      console.log('받은 postData:', postData)
+      
+      // state에서 사용자 정보 가져오기
+      
+      // 이미지 파일을 Base64로 변환
+      let imageData = null
+      if (postData.imageFile) {
+        console.log('이미지 파일 처리 시작:', postData.imageFile.name)
+        const reader = new FileReader()
+        imageData = await new Promise((resolve) => {
+          reader.onload = (e) => {
+            const result = e.target?.result as string
+            console.log('Base64 변환 완료, 길이:', result.length)
+            resolve({
+              name: postData.imageFile!.name,
+              type: postData.imageFile!.type,
+              size: postData.imageFile!.size,
+              data: result
+            })
+          }
+          reader.onerror = (error) => {
+            console.error('FileReader 오류:', error)
+            resolve(null)
+          }
+          reader.readAsDataURL(postData.imageFile!)
+        })
+        console.log('이미지 데이터 준비 완료:', !!imageData)
+      } else {
+        console.log('이미지 파일 없음')
+      }
+      
+      // API 호출하여 데이터베이스에서 수정
+      const requestBody = {
+        content: postData.content,
+        imageFile: imageData
+      }
+      console.log('API 요청 본문:', requestBody)
+      
+      const response = await fetch(`/api/posts/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      const result = await response.json()
+      console.log('API 응답:', result)
+      
+      if (result.success) {
+        console.log('포스트 수정 성공!')
+        // 성공 시 포스트 목록 새로고침
+        fetchPosts()
+      } else {
+        console.error('포스트 수정 실패:', result.error)
+      }
+    } catch (error) {
+      console.error('포스트 수정 오류:', error)
+    }
+  }
+
+  const handleEditPost = (post: { id: number; content: string; imageUrl: string }) => {
+    setEditingPost(post)
+    setModalMode('edit')
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setModalMode('create')
+    setEditingPost(null)
+  }
+
+  const handleDeletePost = async (postId: number) => {
+    try {
+      console.log('=== 포스트 삭제 시작 ===')
+      console.log('삭제할 포스트 ID:', postId)
+      
+      // 사용자 확인
+      if (!confirm('정말로 이 포스트를 삭제하시겠습니까?')) {
+        console.log('사용자가 삭제를 취소했습니다.')
+        return
+      }
+      
+      console.log('삭제 요청 사용자 ID:', userId)
+      
+      // API 호출하여 포스트 삭제
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        }
+      })
+      
+      const result = await response.json()
+      console.log('삭제 API 응답:', result)
+      
+      if (result.success) {
+        console.log('포스트 삭제 성공!')
+        // 성공 시 포스트 목록 새로고침
+        fetchPosts()
+      } else {
+        console.error('포스트 삭제 실패:', result.error)
+        alert('포스트 삭제에 실패했습니다: ' + result.error)
+      }
+    } catch (error) {
+      console.error('포스트 삭제 오류:', error)
+      alert('포스트 삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleAddFriend = async (nickname: string) => {
+    try {
+      console.log('=== 친구 추가 시작 ===')
+      console.log('추가할 친구 닉네임:', nickname)
+      
+      if (!userId || userId === 'anonymous') {
+        throw new Error('로그인이 필요합니다.')
+      }
+      
+      // API 호출하여 친구 연결 요청
+      const response = await fetch('/api/connections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
+        body: JSON.stringify({ friendNickname: nickname })
+      })
+      
+      const result = await response.json()
+      console.log('친구 추가 API 응답:', result)
+      
+      if (result.success) {
+        console.log('친구 추가 성공!')
+        // 성공 시 친구 목록 새로고침
+        fetchConnections()
+        alert('친구 연결 요청을 보냈습니다.')
+      } else {
+        console.error('친구 추가 실패:', result.error)
+        throw new Error(result.error || '친구 추가에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('친구 추가 오류:', error)
+      throw error
+    }
+  }
+
    return (
-      // ...return (
       <Root>
          <Container>
             {/* 전역 헤더는 layout.tsx에서 렌더링됩니다 */}
@@ -17,57 +357,165 @@ export default function Home() {
             </BG>
 
             <Safe>
-               <Header>
+              {/* 로그인된 상태일 때만 Header 표시 */}
+              {userNickname !== '로그인' && (
+                <Header>
                   <Chip style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', fontWeight: '600' }}>Connected</Chip>
                   <Chips>
-                     {['#FFCDB8', '#FFE9C0', '#E5FFBC', '#D3FFEA', '#D3DFFF', '#E7DDFF', '#FFD9EE', '#EAD2A4', '#C3E38F', '#A6E8C8', '#A8BAE8', '#E8AACC'].map((c, i) => (
-                        <Chip key={i} style={{ background: c }} />
-                     ))}
+                    {/* 첫 번째 칩: 로그인한 사용자 */}
+                    <Chip 
+                      key="current-user"
+                      style={{ 
+                        background: CONNECTION_COLORS[0],
+                        border: '1px solid #e5e7eb',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleFriendSelect(null)}
+                    >
+                      {userNickname}
+                    </Chip>
+                    
+                    {/* 연결된 친구들 */}
+                    {connections.map((connection, index) => (
+                      <Chip 
+                        key={connection.connection_id}
+                        style={{ 
+                          background: CONNECTION_COLORS[index + 1],
+                          cursor: 'pointer',
+                          border: selectedFriend === connection.friend_id ? '3px solid #000' : '1px solid transparent',
+                          fontWeight: selectedFriend === connection.friend_id ? '600' : '400'
+                        }}
+                        onClick={() => handleFriendSelect(connection.friend_id)}
+                      >
+                        {connection.friend_nickname}
+                      </Chip>
+                    ))}
+                    
+                    {/* 마지막 칩: 친구추가 (최대 11명까지) */}
+                    {connections.length < 10 && (
+                      <Chip 
+                        key="add-friend"
+                        style={{ 
+                          background: CONNECTION_COLORS[connections.length + 1],
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                        onClick={() => setIsFriendModalOpen(true)}
+                      >
+                        친구추가
+                      </Chip>
+                    )}
                   </Chips>
-               </Header>
+                </Header>
+              )}
 
-               <List>
-                  <Card>
-                     <CardHeader>
-                        <span>곰돌이</span>
-                        <span>2025.07.29</span>
-                        <span>18:39</span>
-                     </CardHeader>
-                     <CardImage style={{ backgroundImage: `url('${IMG_CARD_1}')` }} />
-                     <CardBody>푸른 하늘 아래 펼쳐진 들판엔 바람이 부드럽게 흐르고, 고요한 오후엔 나뭇잎이 속삭이듯 흔들린다.</CardBody>
-                     <CardActions>
-                        <a>체크</a>
-                        <a>책갈피</a>
-                        <a>댓글</a>
-                        <a>삭제</a>
-                        <a>수정</a>
-                     </CardActions>
-                  </Card>
-
-                  <Card>
-                     <CardHeader>
-                        <span>곰돌이</span>
-                        <span>2025.07.29</span>
-                        <span>18:39</span>
-                     </CardHeader>
-                     <CardImage style={{ backgroundImage: `url('${IMG_CARD_2}')` }} />
-                     <CardBody>푸른 하늘 아래 펼쳐진 들판엔 바람이 부드럽게 흐르고…</CardBody>
-                     <CardActions>
-                        <a>체크</a>
-                        <a>책갈피</a>
-                        <a>댓글</a>
-                        <a>삭제</a>
-                        <a>수정</a>
-                     </CardActions>
-                  </Card>
-               </List>
+              {/* 로그인 안된 상태일 때 TwoConnect 소개 페이지 표시 */}
+              {userNickname === '로그인' ? (
+                <IntroSection>
+                  <IntroContent>
+                    <IntroTitle>
+                      가장 가까운 사람들과만 나누는 진짜 이야기, <strong>TwoConnect</strong>
+                    </IntroTitle>
+                    <IntroText>
+                      불특정 다수가 보는 SNS는 부담스럽고, 단둘이만 나누는 메신저는 어딘가 부족하다면?
+                    </IntroText>
+                    <IntroText>
+                      TwoConnect은 최대 6명의 친구와만 연결되어, 각자 따로 피드를 주고받을 수 있는 1:1 중심의 <strong>프라이빗 SNS</strong>입니다.
+                    </IntroText>
+                    <IntroText>
+                      친구별로 독립된 피드가 만들어져요.
+                    </IntroText>
+                    <IntroText>
+                      각각의 공간에서 사진과 글을 공유하며, 관계의 결을 선명히 남길 수 있습니다.
+                    </IntroText>
+                    <IntroText>
+                      사진도, 글도, 감정도 모두 그 친구와 나만의 공간에 남겨보세요.
+                    </IntroText>
+                    <IntroText>
+                      익숙하지만 새로운 방식으로, <strong>오직 소수와 깊게 연결되는 소셜 경험.</strong>
+                    </IntroText>
+                    <IntroText>
+                      TwoConnect에서 가장 가까운 사람들과 진짜 당신의 이야기를 나눠보세요.
+                    </IntroText>
+                    <IntroButton onClick={() => window.location.href = '/login'}>
+                      시작하기 →
+                    </IntroButton>
+                  </IntroContent>
+                </IntroSection>
+              ) : (
+                <>
+                  {/* 로그인된 상태일 때 기존 포스트 목록 표시 */}
+                  <List>
+                    {posts.map((post) => (
+                      <Card key={post.id}>
+                        <CardHeader>
+                          <span>{post.title}</span>
+                          <span>{post.date}</span>
+                          <span>{post.time}</span>
+                        </CardHeader>
+                        <CardImage 
+                          style={{ 
+                            backgroundImage: `url('${post.imageUrl}')`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat'
+                          }} 
+                        />
+                        <CardBody>{post.content}</CardBody>
+                        <CardActions>
+                          <a>체크</a>
+                          <a>책갈피</a>
+                          <a>댓글</a>
+                          <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>삭제</a>
+                          <a onClick={() => handleEditPost(post)} style={{ cursor: 'pointer' }}>수정</a>
+                        </CardActions>
+                      </Card>
+                    ))}
+                  </List>
+                </>
+              )}
             </Safe>
 
-            <Fab aria-label="새 글">
-               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12 5v14M5 12h14" />
-               </svg>
-            </Fab>
+            <PostModal
+               isOpen={isModalOpen}
+               onClose={handleCloseModal}
+               mode={modalMode}
+               initialData={editingPost || undefined}
+               onSubmit={handleCreatePost}
+               onUpdate={handleUpdatePost}
+            />
+
+            <FriendAddModal
+              isOpen={isFriendModalOpen}
+              onClose={() => setIsFriendModalOpen(false)}
+              onAddFriend={handleAddFriend}
+            />
+
+            {/* 로그인된 상태일 때만 글쓰기 버튼 표시 */}
+            {userNickname !== '로그인' && (
+              <Fab aria-label="새 글" onClick={() => setIsModalOpen(true)}>
+                <svg 
+                  viewBox="0 0 24 24" 
+                  aria-hidden="true" 
+                  focusable="false"
+                  width="25"
+                  height="25"
+                  style={{
+                    filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))',
+                    transition: 'transform 0.2s ease'
+                  }}
+                >
+                  <path 
+                    d="M12 5v14M5 12h14" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+              </Fab>
+            )}
          </Container>
       </Root>
    )
@@ -213,11 +661,159 @@ const Fab = styled.button`
    border-radius: 50%;
    display: grid;
    place-items: center;
-   font-size: 40px;
-   font-weight: 100; /* 더 얇은 + 표시 */
-   color: #e6e8ff;
-   background: #6c5ce7;
+   font-size: 24px;
+   font-weight: 300;
+   color: white;
+   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
    border: none;
-   box-shadow: 0 8px 20px rgba(108, 92, 231, 0.35);
+   box-shadow: 
+      0 8px 25px rgba(102, 126, 234, 0.4),
+      0 4px 10px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
    z-index: 100;
+   cursor: pointer;
+   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+   overflow: hidden;
+   
+   /* 호버 효과 */
+   &:hover {
+      transform: translateY(-4px) scale(1.05);
+      box-shadow: 
+         0 12px 35px rgba(102, 126, 234, 0.5),
+         0 8px 15px rgba(0, 0, 0, 0.15),
+         inset 0 1px 0 rgba(255, 255, 255, 0.3);
+   }
+   
+   /* 클릭 효과 */
+   &:active {
+      transform: translateY(-2px) scale(1.02);
+      transition: all 0.1s ease;
+   }
+   
+   /* 내부 빛나는 효과 */
+   &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+         90deg,
+         transparent,
+         rgba(255, 255, 255, 0.3),
+         transparent
+      );
+      transition: left 0.5s;
+   }
+   
+   &:hover::before {
+      left: 100%;
+   }
+   
+   /* 플로팅 애니메이션 */
+   animation: float 3s ease-in-out infinite;
+   
+   @keyframes float {
+      0%, 100% {
+         transform: translateY(0px);
+      }
+      50% {
+         transform: translateY(-8px);
+      }
+   }
+   
+   /* 호버 시 플로팅 애니메이션 일시정지 */
+   &:hover {
+      animation-play-state: paused;
+   }
+   
+   /* 호버 시 아이콘 회전 */
+   &:hover svg {
+      transform: rotate(90deg);
+   }
 `
+
+const IntroSection = styled.section`
+  padding: 60px 40px;
+  text-align: center;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 5px rgba(0, 0, 0, 0.1);
+  margin: 40px 20px;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    z-index: -1;
+  }
+`;
+
+const IntroContent = styled.div`
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+`;
+
+const IntroTitle = styled.h2`
+  font-size: 32px;
+  color: #1e293b;
+  margin-bottom: 40px;
+  line-height: 1.3;
+  font-weight: 700;
+
+  strong {
+    color: #6366f1;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+`;
+
+const IntroText = styled.p`
+  font-size: 18px;
+  color: #475569;
+  line-height: 1.7;
+  margin-bottom: 20px;
+  font-weight: 400;
+
+  strong {
+    color: #334155;
+    font-weight: 600;
+  }
+`;
+
+const IntroButton = styled.button`
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  padding: 16px 32px;
+  border-radius: 12px;
+  border: none;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+  margin-top: 20px;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+

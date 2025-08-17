@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React, { useState } from 'react'
 import styled from 'styled-components'
 
 /**
@@ -10,9 +10,92 @@ import styled from 'styled-components'
  */
 
 export default function LoginPage() {
-   function onSubmit(e: React.FormEvent) {
+   const [isLogin, setIsLogin] = useState(true)
+   const [email, setEmail] = useState('')
+   const [nickname, setNickname] = useState('')
+   const [password, setPassword] = useState('')
+   const [confirmPassword, setConfirmPassword] = useState('')
+   const [loading, setLoading] = useState(false)
+   const [error, setError] = useState('')
+   const [success, setSuccess] = useState('')
+
+   async function onSubmit(e: React.FormEvent) {
       e.preventDefault()
-      // TODO: 실제 로그인 로직 연결
+      setError('')
+      setSuccess('')
+      setLoading(true)
+
+      try {
+         if (isLogin) {
+            // 로그인 로직
+            const response = await fetch('/api/auth/login', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ email, password }),
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+               // 로그인 성공 시 닉네임과 user_id를 localStorage에 저장
+               if (data.nickname) {
+                  localStorage.setItem('user_nickname', data.nickname)
+               }
+               if (data.user_id) {
+                  localStorage.setItem('user_id', data.user_id)
+               }
+               setSuccess('로그인 성공! 메인 페이지로 이동합니다...')
+               setTimeout(() => {
+                  window.location.href = '/'
+               }, 1500)
+            } else {
+               setError(data.error || '로그인에 실패했습니다.')
+            }
+         } else {
+            // 회원가입 로직
+            if (password !== confirmPassword) {
+               setError('비밀번호가 일치하지 않습니다.')
+               setLoading(false)
+               return
+            }
+
+            if (password.length < 6) {
+               setError('비밀번호는 최소 6자 이상이어야 합니다.')
+               setLoading(false)
+               return
+            }
+
+            const response = await fetch('/api/auth/signup', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ email, password, nickname }),
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+               // 회원가입 성공 시 user_id와 닉네임을 localStorage에 저장
+               if (data.user_id) {
+                  localStorage.setItem('user_id', data.user_id)
+               }
+               if (data.nickname) {
+                  localStorage.setItem('user_nickname', data.nickname)
+               }
+               setSuccess('회원가입 성공! 로그인해주세요.')
+               setIsLogin(true)
+               setEmail('')
+               setNickname('')
+               setPassword('')
+               setConfirmPassword('')
+            } else {
+               setError(data.error || '회원가입에 실패했습니다.')
+            }
+         }
+      } catch (err) {
+         setError('서버 오류가 발생했습니다.')
+      } finally {
+         setLoading(false)
+      }
    }
 
    return (
@@ -24,23 +107,96 @@ export default function LoginPage() {
          <Safe>
             <Card onSubmit={onSubmit}>
                <Logo>TwoConnect</Logo>
+               <Subtitle>{isLogin ? '계정에 로그인하세요' : '새 계정을 만드세요'}</Subtitle>
 
-               <Field>
-                  <Label htmlFor="username">아이디</Label>
-                  <Input id="username" name="username" placeholder="아이디" autoComplete="username" />
-               </Field>
+               {error && <ErrorMessage>{error}</ErrorMessage>}
+               {success && <SuccessMessage>{success}</SuccessMessage>}
+
+                               <Field>
+                   <Label htmlFor="email">이메일</Label>
+                   <Input 
+                      id="email" 
+                      name="email" 
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="이메일을 입력하세요" 
+                      autoComplete="email" 
+                      required
+                   />
+                </Field>
+
+                {!isLogin && (
+                   <Field>
+                      <Label htmlFor="nickname">닉네임</Label>
+                      <Input 
+                         id="nickname" 
+                         name="nickname" 
+                         type="text"
+                         value={nickname}
+                         onChange={(e) => setNickname(e.target.value)}
+                         placeholder="닉네임을 입력하세요" 
+                         autoComplete="nickname" 
+                         required
+                      />
+                   </Field>
+                )}
 
                <Field>
                   <Label htmlFor="password">비밀번호</Label>
-                  <Input id="password" name="password" type="password" placeholder="비밀번호" autoComplete="current-password" />
+                  <Input 
+                     id="password" 
+                     name="password" 
+                     type="password" 
+                     value={password}
+                     onChange={(e) => setPassword(e.target.value)}
+                     placeholder="비밀번호를 입력하세요" 
+                     autoComplete="current-password" 
+                     required
+                  />
                </Field>
 
-               <PrimaryButton type="submit">로그인</PrimaryButton>
+               {!isLogin && (
+                  <Field>
+                     <Label htmlFor="confirmPassword">비밀번호 확인</Label>
+                     <Input 
+                        id="confirmPassword" 
+                        name="confirmPassword" 
+                        type="password" 
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="비밀번호를 다시 입력하세요" 
+                        autoComplete="new-password" 
+                        required
+                     />
+                  </Field>
+               )}
+
+               <PrimaryButton type="submit" disabled={loading}>
+                  {loading ? '처리중...' : (isLogin ? '로그인' : '회원가입')}
+               </PrimaryButton>
 
                <Actions>
-                  <ActionButton type="button">회원가입</ActionButton>
-                  <Divider aria-hidden>·</Divider>
-                  <ActionButton type="button">비밀번호 찾기</ActionButton>
+                  <ActionButton 
+                     type="button" 
+                     onClick={() => {
+                        setIsLogin(!isLogin)
+                        setError('')
+                        setSuccess('')
+                        setEmail('')
+                        setNickname('')
+                        setPassword('')
+                        setConfirmPassword('')
+                     }}
+                  >
+                     {isLogin ? '회원가입' : '로그인'}
+                  </ActionButton>
+                  {isLogin && (
+                     <>
+                        <Divider aria-hidden>·</Divider>
+                        <ActionButton type="button">비밀번호 찾기</ActionButton>
+                     </>
+                  )}
                </Actions>
             </Card>
          </Safe>
@@ -109,6 +265,13 @@ const Logo = styled.h1`
    text-align: center;
 `
 
+const Subtitle = styled.p`
+   margin: 0 0 20px;
+   font-size: 14px;
+   color: #666;
+   text-align: center;
+`
+
 const Field = styled.div`
    display: grid;
    gap: 6px;
@@ -152,11 +315,16 @@ const PrimaryButton = styled.button`
    font-size: 14px;
    cursor: pointer;
 
-   &:hover {
+   &:hover:not(:disabled) {
       filter: brightness(1.05);
    }
-   &:active {
+   &:active:not(:disabled) {
       transform: translateY(1px);
+   }
+   
+   &:disabled {
+      background: #999;
+      cursor: not-allowed;
    }
 `
 
@@ -181,3 +349,23 @@ const ActionButton = styled.button`
 `
 
 const Divider = styled.span``
+
+const ErrorMessage = styled.div`
+   padding: 8px 12px;
+   background: #fef2f2;
+   border: 1px solid #fecaca;
+   border-radius: 6px;
+   color: #dc2626;
+   font-size: 12px;
+   text-align: center;
+`
+
+const SuccessMessage = styled.div`
+   padding: 8px 12px;
+   background: #f0fdf4;
+   border: 1px solid #bbf7d0;
+   border-radius: 6px;
+   color: #16a34a;
+   font-size: 12px;
+   text-align: center;
+`
