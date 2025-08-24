@@ -12,15 +12,23 @@ interface PostModalProps {
     content: string
     imageUrl: string
   }
-  onSubmit: (post: { content: string; imageFile: File | null }) => void
+  onSubmit: (post: { content: string; imageFile: File | null; selectedFriendId?: string }) => void
   onUpdate?: (id: number, post: { content: string; imageFile: File | null }) => void
+  connections: Array<{
+    connection_id: number
+    friend_id: string
+    friend_nickname: string
+    connection_status: string
+    created_at: string
+  }>
 }
 
-export default function PostModal({ isOpen, onClose, mode, initialData, onSubmit, onUpdate }: PostModalProps) {
+export default function PostModal({ isOpen, onClose, mode, initialData, onSubmit, onUpdate, connections }: PostModalProps) {
   const [content, setContent] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [selectedFriendId, setSelectedFriendId] = useState<string>('')
 
   // 수정 모드일 때 초기 데이터 설정
   React.useEffect(() => {
@@ -32,6 +40,7 @@ export default function PostModal({ isOpen, onClose, mode, initialData, onSubmit
       setContent('')
       setImageFile(null)
       setImagePreview('')
+      setSelectedFriendId('') // 친구 선택 초기화
     }
   }, [mode, initialData])
 
@@ -74,19 +83,20 @@ export default function PostModal({ isOpen, onClose, mode, initialData, onSubmit
 
     setLoading(true)
     try {
-      console.log('제출 데이터:', { content, imageFile, mode })
+      console.log('제출 데이터:', { content, imageFile, mode, selectedFriendId })
       console.log('이미지 파일 존재 여부:', !!imageFile)
       console.log('이미지 미리보기 존재 여부:', !!imagePreview)
       
       if (mode === 'edit' && onUpdate && initialData) {
         await onUpdate(initialData.id, { content, imageFile })
       } else {
-        await onSubmit({ content, imageFile })
+        await onSubmit({ content, imageFile, selectedFriendId })
       }
       // 성공 후 폼 초기화
       setContent('')
       setImageFile(null)
       setImagePreview('')
+      setSelectedFriendId('')
       onClose()
     } catch (error) {
       console.error('Post submission error:', error)
@@ -106,9 +116,26 @@ export default function PostModal({ isOpen, onClose, mode, initialData, onSubmit
          </ModalHeader>
 
                  <ModalForm onSubmit={handleSubmit}>
+                     {/* 친구 선택 드롭다운 (생성 모드에서만 표시) */}
+                     {mode === 'create' && connections.length > 0 && (
+                       <FormField>
+                         <Label>친구 선택 (선택사항)</Label>
+                         <Select
+                           value={selectedFriendId}
+                           onChange={(e) => setSelectedFriendId(e.target.value)}
+                         >
+                           <option value="">본인 피드에 작성</option>
+                           {connections.map((connection) => (
+                             <option key={connection.connection_id} value={connection.friend_id}>
+                               {connection.friend_nickname}님과의 피드에 작성
+                             </option>
+                           ))}
+                         </Select>
+                       </FormField>
+                     )}
 
                      <FormField>
-             <Label>이미지 업로드</Label>
+                       <Label>이미지 업로드</Label>
              <FileInput
                type="file"
                accept="image/*"
@@ -343,5 +370,22 @@ const SubmitButton = styled.button`
   &:disabled {
     background: #b8b5e6;
     cursor: not-allowed;
+  }
+`
+
+const Select = styled.select`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  
+  &:focus {
+    outline: none;
+    border-color: #6c5ce7;
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
   }
 `

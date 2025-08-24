@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import PostModal from '@/components/PostModal'
 import FriendAddModal from '../components/FriendAddModal'
+import CommentModal from '../components/CommentModal'
 
 // 색상 순서 정의 (최대 11명까지)
 const CONNECTION_COLORS = [
@@ -10,10 +11,15 @@ const CONNECTION_COLORS = [
   '#E7DDFF', '#FFD9EE', '#EAD2A4', '#C3E38F', '#A6E8C8'
 ]
 
+// 색상 인덱스 안전 적용 (색상 개수를 넘어가면 순환)
+const getConnectionColor = (index: number) => CONNECTION_COLORS[index % CONNECTION_COLORS.length]
+
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFriendModalOpen, setIsFriendModalOpen] = useState(false)
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [selectedPostForComment, setSelectedPostForComment] = useState<{ id: number; content: string } | null>(null)
   const [editingPost, setEditingPost] = useState<{
     id: number
     content: string
@@ -41,7 +47,8 @@ export default function Home() {
   // fetchPosts 함수 정의
   const fetchPosts = async () => {
     try {
-      const response = await fetch('/api/posts')
+      // 본인의 게시글만 가져오기
+      const response = await fetch(`/api/posts?userId=${userNickname}`)
       const result = await response.json()
       
       if (result.success) {
@@ -77,17 +84,52 @@ export default function Home() {
     setUserId(id)
     
     fetchPosts()
-    fetchConnections()
+    
+    // userNickname이 설정된 후에만 fetchConnections 호출
+    if (nickname !== '로그인') {
+      fetchConnections(nickname)
+    }
+
+    // 친구 연결 목록 갱신 이벤트 리스너
+    const onConnectionsUpdated = () => {
+      if (nickname !== '로그인') {
+        fetchConnections(nickname)
+      }
+    }
+    // '내가쓴글' 모달에서 친구 선택 시 이벤트 리스너
+    const onMyPostsShow = (e: any) => {
+      try {
+        const friendIdFromEvent = e?.detail?.friendId as string | undefined
+        if (!friendIdFromEvent) return
+        setSelectedFriend(friendIdFromEvent)
+        fetchMyPostsWithFriend(friendIdFromEvent)
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('connections:updated', onConnectionsUpdated)
+      window.addEventListener('myposts:show', onMyPostsShow as EventListener)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('connections:updated', onConnectionsUpdated)
+        window.removeEventListener('myposts:show', onMyPostsShow as EventListener)
+      }
+    }
   }, [])
 
-  const fetchConnections = async () => {
+  const fetchConnections = async (userId: string) => {
     try {
+      console.log('fetchConnections 호출됨, userId:', userId)
       const response = await fetch(`/api/connections?userId=${userId}`)
       const result = await response.json()
+      
+      console.log('API 응답:', result)
       
       if (result.success) {
         console.log('연결된 친구들:', result.connections)
         setConnections(result.connections)
+      } else {
+        console.error('API 응답 실패:', result.error)
       }
     } catch (error) {
       console.error('친구 연결 조회 오류:', error)
@@ -100,13 +142,15 @@ export default function Home() {
     if (friendId) {
       fetchFriendPosts(friendId)
     } else {
-      fetchPosts() // 전체 피드로 돌아가기
+      // 본인의 피드로 돌아가기
+      fetchPosts()
     }
   }
 
   const fetchFriendPosts = async (friendId: string) => {
     try {
-      const response = await fetch(`/api/posts?friendId=${friendId}`)
+      // 선택된 친구와 본인의 게시글만 가져오기
+      const response = await fetch(`/api/posts?userId=${userNickname}&friendId=${friendId}`)
       const result = await response.json()
       
       if (result.success) {
@@ -125,7 +169,29 @@ export default function Home() {
     }
   }
 
-  const handleCreatePost = async (postData: { content: string; imageFile: File | null }) => {
+  // 특정 친구와의 피드에서 "내가 쓴 글"만 조회
+  const fetchMyPostsWithFriend = async (friendId: string) => {
+    try {
+      const response = await fetch(`/api/posts?userId=${userNickname}&friendId=${friendId}`)
+      const result = await response.json()
+      if (result.success) {
+        const onlyMine = result.posts.filter((post: any) => post.nickname === userNickname)
+        const formattedPosts = onlyMine.map((post: any) => ({
+          id: post.id,
+          title: post.nickname,
+          content: post.content,
+          imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+          date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        }))
+        setPosts(formattedPosts)
+      }
+    } catch (error) {
+      console.error('내가쓴글(친구별) 조회 오류:', error)
+    }
+  }
+
+  const handleCreatePost = async (postData: { content: string; imageFile: File | null; selectedFriendId?: string }) => {
     try {
       console.log('=== 포스트 생성 시작 ===')
       console.log('받은 postData:', postData)
@@ -163,7 +229,8 @@ export default function Home() {
       // API 호출하여 데이터베이스에 저장
       const requestBody = {
         content: postData.content,
-        imageFile: imageData
+        imageFile: imageData,
+        selectedFriendId: postData.selectedFriendId || null
       }
       console.log('API 요청 본문:', requestBody)
       
@@ -183,7 +250,13 @@ export default function Home() {
       if (result.success) {
         console.log('포스트 생성 성공!')
         // 성공 시 포스트 목록 새로고침
-        fetchPosts()
+        if (postData.selectedFriendId) {
+          // 친구와의 피드에 작성한 경우 해당 피드 새로고침
+          fetchFriendPosts(postData.selectedFriendId)
+        } else {
+          // 본인 피드에 작성한 경우 본인 피드 새로고침
+          fetchPosts()
+        }
       } else {
         console.error('포스트 생성 실패:', result.error)
       }
@@ -270,6 +343,18 @@ export default function Home() {
     setEditingPost(null)
   }
 
+  const handleOpenCommentModal = (postId: number, postContent: string) => {
+    setSelectedPostForComment({ id: postId, content: postContent })
+    setIsCommentModalOpen(true)
+  }
+
+  const handleCloseCommentModal = () => {
+    setIsCommentModalOpen(false)
+    setSelectedPostForComment(null)
+  }
+
+
+
   const handleDeletePost = async (postId: number) => {
     try {
       console.log('=== 포스트 삭제 시작 ===')
@@ -314,7 +399,7 @@ export default function Home() {
       console.log('=== 친구 추가 시작 ===')
       console.log('추가할 친구 닉네임:', nickname)
       
-      if (!userId || userId === 'anonymous') {
+      if (!userNickname || userNickname === '로그인') {
         throw new Error('로그인이 필요합니다.')
       }
       
@@ -323,7 +408,7 @@ export default function Home() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId
+          'x-user-id': userNickname
         },
         body: JSON.stringify({ friendNickname: nickname })
       })
@@ -334,7 +419,7 @@ export default function Home() {
       if (result.success) {
         console.log('친구 추가 성공!')
         // 성공 시 친구 목록 새로고침
-        fetchConnections()
+        fetchConnections(userNickname)
         alert('친구 연결 요청을 보냈습니다.')
       } else {
         console.error('친구 추가 실패:', result.error)
@@ -366,7 +451,7 @@ export default function Home() {
                     <Chip 
                       key="current-user"
                       style={{ 
-                        background: CONNECTION_COLORS[0],
+                        background: getConnectionColor(0),
                         border: '1px solid #e5e7eb',
                         fontWeight: '600',
                         cursor: 'pointer'
@@ -381,9 +466,10 @@ export default function Home() {
                       <Chip 
                         key={connection.connection_id}
                         style={{ 
-                          background: CONNECTION_COLORS[index + 1],
+                          background: getConnectionColor(index + 1),
                           cursor: 'pointer',
-                          border: selectedFriend === connection.friend_id ? '3px solid #000' : '1px solid transparent',
+                          outline: selectedFriend === connection.friend_id ? '3px solid #000' : '1px solid transparent',
+                          zIndex: selectedFriend === connection.friend_id ? '10' : '1',
                           fontWeight: selectedFriend === connection.friend_id ? '600' : '400'
                         }}
                         onClick={() => handleFriendSelect(connection.friend_id)}
@@ -397,7 +483,7 @@ export default function Home() {
                       <Chip 
                         key="add-friend"
                         style={{ 
-                          background: CONNECTION_COLORS[connections.length + 1],
+                          background: getConnectionColor(connections.length + 1),
                           cursor: 'pointer',
                           fontWeight: '600'
                         }}
@@ -464,11 +550,15 @@ export default function Home() {
                         />
                         <CardBody>{post.content}</CardBody>
                         <CardActions>
-                          <a>체크</a>
+                          <a style={{ opacity: post.title === userNickname ? 0 : 1 }}>체크</a>
                           <a>책갈피</a>
-                          <a>댓글</a>
-                          <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>삭제</a>
-                          <a onClick={() => handleEditPost(post)} style={{ cursor: 'pointer' }}>수정</a>
+                          <a onClick={() => handleOpenCommentModal(post.id, post.content)} style={{ cursor: 'pointer' }}>댓글</a>
+                          {post.title === userNickname && (
+                            <>
+                              <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>삭제</a>
+                              <a onClick={() => handleEditPost(post)} style={{ cursor: 'pointer' }}>수정</a>
+                            </>
+                          )}
                         </CardActions>
                       </Card>
                     ))}
@@ -484,12 +574,20 @@ export default function Home() {
                initialData={editingPost || undefined}
                onSubmit={handleCreatePost}
                onUpdate={handleUpdatePost}
+               connections={connections}
             />
 
             <FriendAddModal
               isOpen={isFriendModalOpen}
               onClose={() => setIsFriendModalOpen(false)}
               onAddFriend={handleAddFriend}
+            />
+
+            <CommentModal
+              isOpen={isCommentModalOpen}
+              onClose={handleCloseCommentModal}
+              postId={selectedPostForComment?.id || 0}
+              postContent={selectedPostForComment?.content || ''}
             />
 
             {/* 로그인된 상태일 때만 글쓰기 버튼 표시 */}
@@ -594,6 +692,8 @@ const Chips = styled.div`
    flex-wrap: wrap;
    //  gap: 8px;
    opacity: 0.8;
+   
+   
 `
 const Chip = styled.div`
    width: 120px;
@@ -603,6 +703,9 @@ const Chip = styled.div`
    background: #eee;
    //  border-radius: 8px;
    text-align: center;
+   box-sizing: border-box;
+   
+
 `
 
 const List = styled.div`

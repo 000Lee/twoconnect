@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, imageFile } = await request.json()
+    const { content, imageFile, selectedFriendId } = await request.json()
 
     // 입력 검증
     if (!content || !content.trim()) {
@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
 
     // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient()
+
+    // RLS를 위한 사용자 닉네임 설정
+    await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
 
     // 이미지 파일이 있으면 처리
     let imageUrl = null
@@ -54,7 +57,8 @@ export async function POST(request: NextRequest) {
       p_user_id: userId,
       p_nickname: userNickname,
       p_content: content.trim(),
-      p_image_url: imageUrl
+      p_image_url: imageUrl,
+      p_friend_id: selectedFriendId || null
     })
 
     if (error) {
@@ -82,12 +86,41 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const friendId = searchParams.get('friendId')
+
     const supabase = createServerSupabaseClient()
 
-    // 포스트 조회 함수 호출
-    const { data, error } = await supabase.rpc('get_posts')
+    // RLS를 위한 사용자 닉네임 설정
+    if (userId) {
+      await supabase.rpc('set_user_nickname', { p_nickname: userId })
+    }
+
+    let posts
+    let error
+
+    if (friendId) {
+      // 친구를 선택한 경우: 해당 친구와 본인의 게시글만 가져오기
+      const { data, error: friendError } = await supabase.rpc('get_connected_posts', {
+        p_user_id: userId,
+        p_friend_id: friendId
+      })
+      posts = data
+      error = friendError
+    } else if (userId) {
+      // 본인의 게시글만 가져오기
+      const { data, error: userError } = await supabase.rpc('get_user_posts', {
+        p_user_id: userId
+      })
+      posts = data
+      error = userError
+    } else {
+      // 파라미터가 없는 경우 빈 배열 반환
+      return NextResponse.json({ success: true, posts: [] })
+    }
 
     if (error) {
       console.error('Posts fetch error:', error)
@@ -97,7 +130,7 @@ export async function GET() {
       )
     }
 
-    return NextResponse.json({ success: true, posts: data })
+    return NextResponse.json({ success: true, posts: posts || [] })
   } catch (error) {
     console.error('Posts API error:', error)
     return NextResponse.json(
