@@ -33,7 +33,7 @@ export async function DELETE(
     }
 
     // 본인이 포함된 연결만 삭제 가능
-    if (connection.user1_nickname !== userNickname && connection.user2_nickname !== userNickname) {
+    if (connection.user_id1 !== userNickname && connection.user_id2 !== userNickname) {
       return NextResponse.json(
         { success: false, error: '연결을 삭제할 권한이 없습니다.' },
         { status: 403 }

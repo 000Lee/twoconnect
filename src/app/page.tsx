@@ -32,6 +32,18 @@ export default function Home() {
     imageUrl: string
     date: string
     time: string
+    isChecked?: boolean
+    isBookmarked?: boolean
+  }>>([])
+  const [friendPosts, setFriendPosts] = useState<Array<{
+    id: number
+    title: string
+    content: string
+    imageUrl: string
+    date: string
+    time: string
+    isChecked?: boolean
+    isBookmarked?: boolean
   }>>([])
   const [connections, setConnections] = useState<Array<{
     connection_id: number
@@ -47,6 +59,12 @@ export default function Home() {
   // fetchPosts 함수 정의
   const fetchPosts = async () => {
     try {
+      // userNickname이 올바르게 설정되었는지 확인
+      if (userNickname === '로그인') {
+        console.log('사용자가 로그인되지 않음, fetchPosts 건너뜀')
+        return
+      }
+      
       // 본인의 게시글만 가져오기
       const response = await fetch(`/api/posts?userId=${userNickname}`)
       const result = await response.json()
@@ -55,8 +73,40 @@ export default function Home() {
         console.log('받아온 포스트 데이터:', result.posts)
         
         // 데이터베이스 형식을 프론트엔드 형식으로 변환
-        const formattedPosts = result.posts.map((post: any) => {
+        const formattedPosts = await Promise.all(result.posts.map(async (post: any) => {
           console.log('포스트 이미지 URL:', post.image_url)
+          
+          // 체크 상태 조회
+          let isChecked = false
+          try {
+            const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
+              headers: {
+                'x-user-nickname': userNickname
+              }
+            })
+            const checkResult = await checkResponse.json()
+            if (checkResult.success) {
+              isChecked = checkResult.isChecked
+            }
+          } catch (error) {
+            console.error('체크 상태 조회 오류:', error)
+          }
+          
+          // 책갈피 상태 조회
+          let isBookmarked = false
+          try {
+            const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
+              headers: {
+                'x-user-nickname': userNickname
+              }
+            })
+            const bookmarkResult = await bookmarkResponse.json()
+            if (bookmarkResult.success) {
+              isBookmarked = bookmarkResult.isBookmarked
+            }
+          } catch (error) {
+            console.error('책갈피 상태 조회 오류:', error)
+          }
           
           return {
             id: post.id,
@@ -64,9 +114,11 @@ export default function Home() {
             content: post.content,
             imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
             date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-            time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+            time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            isChecked,
+            isBookmarked
           }
-        })
+        }))
         
         console.log('변환된 포스트:', formattedPosts)
         setPosts(formattedPosts)
@@ -83,10 +135,9 @@ export default function Home() {
     setUserNickname(nickname)
     setUserId(id)
     
-    fetchPosts()
-    
-    // userNickname이 설정된 후에만 fetchConnections 호출
+    // userNickname이 올바르게 설정된 후에만 fetchPosts 호출
     if (nickname !== '로그인') {
+      fetchPosts()
       fetchConnections(nickname)
     }
 
@@ -115,7 +166,7 @@ export default function Home() {
         window.removeEventListener('myposts:show', onMyPostsShow as EventListener)
       }
     }
-  }, [])
+  }, [userNickname]) // userNickname이 변경될 때마다 useEffect 실행
 
   const fetchConnections = async (userId: string) => {
     try {
@@ -154,14 +205,52 @@ export default function Home() {
       const result = await response.json()
       
       if (result.success) {
-        const formattedPosts = result.posts.map((post: any) => ({
-          id: post.id,
-          title: post.nickname,
-          content: post.content,
-          imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
-          date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-          time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        // 체크/책갈피 상태도 함께 조회
+        const formattedPosts = await Promise.all(result.posts.map(async (post: any) => {
+          // 체크 상태 조회
+          let isChecked = false
+          try {
+            const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
+              headers: {
+                'x-user-nickname': userNickname
+              }
+            })
+            const checkResult = await checkResponse.json()
+            if (checkResult.success) {
+              isChecked = checkResult.isChecked
+            }
+          } catch (error) {
+            console.error('체크 상태 조회 오류:', error)
+          }
+          
+          // 책갈피 상태 조회
+          let isBookmarked = false
+          try {
+            const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
+              headers: {
+                'x-user-nickname': userNickname
+              }
+            })
+            const bookmarkResult = await bookmarkResponse.json()
+            if (bookmarkResult.success) {
+              isBookmarked = bookmarkResult.isBookmarked
+            }
+          } catch (error) {
+            console.error('책갈피 상태 조회 오류:', error)
+          }
+          
+          return {
+            id: post.id,
+            title: post.nickname,
+            content: post.content,
+            imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+            date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+            time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            isChecked,
+            isBookmarked
+          }
         }))
+        
         setPosts(formattedPosts)
       }
     } catch (error) {
@@ -176,14 +265,53 @@ export default function Home() {
       const result = await response.json()
       if (result.success) {
         const onlyMine = result.posts.filter((post: any) => post.nickname === userNickname)
-        const formattedPosts = onlyMine.map((post: any) => ({
-          id: post.id,
-          title: post.nickname,
-          content: post.content,
-          imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
-          date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-          time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        
+        // 체크/책갈피 상태도 함께 조회
+        const formattedPosts = await Promise.all(onlyMine.map(async (post: any) => {
+          // 체크 상태 조회
+          let isChecked = false
+          try {
+            const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
+              headers: {
+                'x-user-nickname': userNickname
+              }
+            })
+            const checkResult = await checkResponse.json()
+            if (checkResult.success) {
+              isChecked = checkResult.isChecked
+            }
+          } catch (error) {
+            console.error('체크 상태 조회 오류:', error)
+          }
+          
+          // 책갈피 상태 조회
+          let isBookmarked = false
+          try {
+            const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
+              headers: {
+                'x-user-nickname': userNickname
+              }
+            })
+            const bookmarkResult = await bookmarkResponse.json()
+            if (bookmarkResult.success) {
+              isBookmarked = bookmarkResult.isBookmarked
+            }
+          } catch (error) {
+            console.error('책갈피 상태 조회 오류:', error)
+          }
+          
+          return {
+            id: post.id,
+            title: post.nickname,
+            content: post.content,
+            imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+            date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+            time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            isChecked,
+            isBookmarked
+          }
         }))
+        
         setPosts(formattedPosts)
       }
     } catch (error) {
@@ -354,6 +482,102 @@ export default function Home() {
   }
 
 
+
+  const handleCheckPost = async (postId: number) => {
+    try {
+      console.log('=== 포스트 체크/해제 시작 ===')
+      console.log('처리할 포스트 ID:', postId)
+      
+      const response = await fetch(`/api/posts/${postId}/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-nickname': userNickname
+        }
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        console.log('포스트 체크/해제 성공!', result.action)
+        
+        // 체크 상태에 따라 게시글 상태 업데이트
+        const newCheckedState = result.action === 'checked'
+        
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === postId 
+              ? { ...post, isChecked: newCheckedState }
+              : post
+          )
+        )
+        
+        // 선택된 친구의 게시글도 업데이트
+        if (selectedFriend) {
+          setFriendPosts(prevPosts => 
+            prevPosts.map(post => 
+              post.id === postId 
+                ? { ...post, isChecked: newCheckedState }
+                : post
+            )
+          )
+        }
+      } else {
+        console.error('포스트 체크/해제 실패:', result.error)
+        alert('게시글 체크/해제에 실패했습니다: ' + result.error)
+      }
+    } catch (error) {
+      console.error('포스트 체크/해제 오류:', error)
+      alert('게시글 체크/해제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleBookmarkPost = async (postId: number) => {
+    try {
+      console.log('=== 포스트 책갈피/해제 시작 ===')
+      console.log('처리할 포스트 ID:', postId)
+      
+      const response = await fetch(`/api/posts/${postId}/bookmark`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-nickname': userNickname
+        }
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        console.log('포스트 책갈피/해제 성공!', result.action)
+        
+        // 책갈피 상태에 따라 게시글 상태 업데이트
+        const newBookmarkedState = result.action === 'bookmarked'
+        
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === postId 
+              ? { ...post, isBookmarked: newBookmarkedState }
+              : post
+          )
+        )
+        
+        // 선택된 친구의 게시글도 업데이트
+        if (selectedFriend) {
+          setFriendPosts(prevPosts => 
+            prevPosts.map(post => 
+              post.id === postId 
+                ? { ...post, isBookmarked: newBookmarkedState }
+                : post
+            )
+          )
+        }
+      } else {
+        console.error('포스트 책갈피/해제 실패:', result.error)
+        alert('게시글 책갈피/해제에 실패했습니다: ' + result.error)
+      }
+    } catch (error) {
+      console.error('포스트 책갈피/해제 오류:', error)
+      alert('게시글 책갈피/해제 중 오류가 발생했습니다.')
+    }
+  }
 
   const handleDeletePost = async (postId: number) => {
     try {
@@ -550,8 +774,27 @@ export default function Home() {
                         />
                         <CardBody>{post.content}</CardBody>
                         <CardActions>
-                          <a style={{ opacity: post.title === userNickname ? 0 : 1 }}>체크</a>
-                          <a>책갈피</a>
+                          <a 
+                            onClick={() => handleCheckPost(post.id)} 
+                            style={{ 
+                              opacity: post.title === userNickname ? 0 : 1,
+                              cursor: post.title === userNickname ? 'default' : 'pointer',
+                              color: post.isChecked ? '#6c5ce7' : '#4b5563',
+                              fontWeight: post.isChecked ? '600' : '400'
+                            }}
+                          >
+                            {post.isChecked ? '체크' : '체크'}
+                          </a>
+                          <a 
+                            onClick={() => handleBookmarkPost(post.id)} 
+                            style={{ 
+                              cursor: 'pointer',
+                              color: post.isBookmarked ? '#10b981' : '#4b5563',
+                              fontWeight: post.isBookmarked ? '600' : '400'
+                            }}
+                          >
+                            {post.isBookmarked ? '책갈피' : '책갈피'}
+                          </a>
                           <a onClick={() => handleOpenCommentModal(post.id, post.content)} style={{ cursor: 'pointer' }}>댓글</a>
                           {post.title === userNickname && (
                             <>
@@ -642,7 +885,7 @@ const BG = styled.div`
 const BGPattern = styled.div`
    position: absolute;
    inset: 0;
-   opacity: 0.55;
+   opacity: 0.8;
 
    /* 8px 세로/가로 라인 + 40px 굵은 라인으로 그래프 종이 느낌 */
    background-image:
