@@ -5,13 +5,15 @@ import styled from 'styled-components'
 import FriendRequestModal from './FriendRequestModal'
 import MyPostsModal from './MyPostsModal'
 import FriendManagementModal from './FriendManagementModal'
+import PostCheckModal from './PostCheckModal'
 
 export default function AppHeader() {
    const [nickname, setNickname] = useState<string | null>(null)
    const [isDropdownOpen, setIsDropdownOpen] = useState(false)
    const [isFriendRequestModalOpen, setIsFriendRequestModalOpen] = useState(false)
    const [isMyPostsModalOpen, setIsMyPostsModalOpen] = useState(false)
-  const [isFriendManagementModalOpen, setIsFriendManagementModalOpen] = useState(false)
+   const [isFriendManagementModalOpen, setIsFriendManagementModalOpen] = useState(false)
+   const [isPostCheckModalOpen, setIsPostCheckModalOpen] = useState(false)
 
    useEffect(() => {
       // localStorage에서 닉네임 확인
@@ -37,16 +39,18 @@ export default function AppHeader() {
 
    const handleMenuClick = (menuType: string) => {
       console.log(`${menuType} 메뉴 클릭됨`)
-      
+
       if (menuType === '친구요청') {
          setIsFriendRequestModalOpen(true)
       } else if (menuType === '친구관리') {
          setIsFriendManagementModalOpen(true)
       } else if (menuType === '내가쓴글') {
          setIsMyPostsModalOpen(true)
+      } else if (menuType === '체크') {
+         setIsPostCheckModalOpen(true)
       }
       // TODO: 다른 메뉴들에 따른 동작 구현
-      
+
       closeDropdown()
    }
 
@@ -62,30 +66,19 @@ export default function AppHeader() {
                   {nickname ? (
                      <UserSection>
                         <UserNickname onClick={toggleDropdown} style={{ cursor: 'pointer' }}>
-                           {nickname}님
-                           <DropdownArrow isOpen={isDropdownOpen}>▼</DropdownArrow>
+                           {nickname}님<DropdownArrow isOpen={isDropdownOpen}>▼</DropdownArrow>
                         </UserNickname>
-                        
+
                         {isDropdownOpen && (
                            <DropdownMenu>
-                              <DropdownItem onClick={() => handleMenuClick('친구요청')}>
-                                 친구요청
-                              </DropdownItem>
-                              <DropdownItem onClick={() => handleMenuClick('친구관리')}>
-                                 친구관리
-                              </DropdownItem>
-                              <DropdownItem onClick={() => handleMenuClick('체크')}>
-                                 체크
-                              </DropdownItem>
-                              <DropdownItem onClick={() => handleMenuClick('책갈피')}>
-                                 책갈피
-                              </DropdownItem>
-                              <DropdownItem onClick={() => handleMenuClick('내가쓴글')}>
-                                 내가쓴글
-                              </DropdownItem>
+                              <DropdownItem onClick={() => handleMenuClick('친구요청')}>친구요청</DropdownItem>
+                              <DropdownItem onClick={() => handleMenuClick('친구관리')}>친구관리</DropdownItem>
+                              <DropdownItem onClick={() => handleMenuClick('체크')}>체크</DropdownItem>
+                              <DropdownItem onClick={() => handleMenuClick('책갈피')}>책갈피</DropdownItem>
+                              <DropdownItem onClick={() => handleMenuClick('내가쓴글')}>내가쓴글</DropdownItem>
                            </DropdownMenu>
                         )}
-                        
+
                         <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
                      </UserSection>
                   ) : (
@@ -96,27 +89,21 @@ export default function AppHeader() {
                </TopRight>
             </TopBarInner>
          </TopBar>
-         
+
          {/* 드롭다운 외부 클릭 시 닫기 */}
          {isDropdownOpen && <DropdownOverlay onClick={closeDropdown} />}
-         
+
          {/* 친구요청 모달 */}
-         <FriendRequestModal
-            isOpen={isFriendRequestModalOpen}
-            onClose={() => setIsFriendRequestModalOpen(false)}
-         />
+         <FriendRequestModal isOpen={isFriendRequestModalOpen} onClose={() => setIsFriendRequestModalOpen(false)} />
 
          {/* 내가쓴글 모달 */}
-         <MyPostsModal
-            isOpen={isMyPostsModalOpen}
-            onClose={() => setIsMyPostsModalOpen(false)}
-         />
+         <MyPostsModal isOpen={isMyPostsModalOpen} onClose={() => setIsMyPostsModalOpen(false)} />
 
          {/* 친구관리 모달 */}
-         <FriendManagementModal
-            isOpen={isFriendManagementModalOpen}
-            onClose={() => setIsFriendManagementModalOpen(false)}
-         />
+         <FriendManagementModal isOpen={isFriendManagementModalOpen} onClose={() => setIsFriendManagementModalOpen(false)} />
+
+         {/* 체크 모달 */}
+         <PostCheckModal isOpen={isPostCheckModalOpen} onClose={() => setIsPostCheckModalOpen(false)} />
       </HeaderWrap>
    )
 }
@@ -198,18 +185,18 @@ const LogoutButton = styled.button`
    color: #666;
    cursor: pointer;
    text-decoration: underline;
-   
+
    &:hover {
       color: #333;
    }
 `
 
 const DropdownArrow = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== 'isOpen'
+   shouldForwardProp: (prop) => prop !== 'isOpen',
 })<{ isOpen: boolean }>`
-  font-size: 12px;
-  transform: ${props => props.isOpen ? 'rotate(180deg)' : 'rotate(0deg)'};
-  transition: transform 0.2s ease;
+   font-size: 12px;
+   transform: ${(props) => (props.isOpen ? 'rotate(180deg)' : 'rotate(0deg)')};
+   transition: transform 0.2s ease;
 `
 
 const DropdownMenu = styled.div`
