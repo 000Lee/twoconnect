@@ -6,6 +6,7 @@ import FriendRequestModal from './FriendRequestModal'
 import MyPostsModal from './MyPostsModal'
 import FriendManagementModal from './FriendManagementModal'
 import PostCheckModal from './PostCheckModal'
+import BookmarkModal from './BookmarkModal'
 
 export default function AppHeader() {
    const [nickname, setNickname] = useState<string | null>(null)
@@ -14,6 +15,7 @@ export default function AppHeader() {
    const [isMyPostsModalOpen, setIsMyPostsModalOpen] = useState(false)
    const [isFriendManagementModalOpen, setIsFriendManagementModalOpen] = useState(false)
    const [isPostCheckModalOpen, setIsPostCheckModalOpen] = useState(false)
+   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false)
 
    useEffect(() => {
       // localStorage에서 닉네임 확인
@@ -48,6 +50,8 @@ export default function AppHeader() {
          setIsMyPostsModalOpen(true)
       } else if (menuType === '체크') {
          setIsPostCheckModalOpen(true)
+      } else if (menuType === '책갈피') {
+         setIsBookmarkModalOpen(true)
       }
       // TODO: 다른 메뉴들에 따른 동작 구현
 
@@ -104,6 +108,9 @@ export default function AppHeader() {
 
          {/* 체크 모달 */}
          <PostCheckModal isOpen={isPostCheckModalOpen} onClose={() => setIsPostCheckModalOpen(false)} />
+
+         {/* 책갈피 모달 */}
+         <BookmarkModal isOpen={isBookmarkModalOpen} onClose={() => setIsBookmarkModalOpen(false)} />
       </HeaderWrap>
    )
 }

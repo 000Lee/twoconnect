@@ -127,14 +127,75 @@ export default function Home() {
             fetchMyPostsWithFriend(friendIdFromEvent)
          } catch {}
       }
+
+      // MyPostsModal에서 게시글 수정 시 이벤트 리스너
+      const onPostUpdated = (e: any) => {
+         try {
+            const { postId, content, imageUrl } = e?.detail || {}
+            if (!postId) return
+
+            // 홈화면의 posts 상태에서 해당 게시글 업데이트
+            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, content, imageUrl } : post)))
+         } catch (error) {
+            console.error('게시글 수정 이벤트 처리 오류:', error)
+         }
+      }
+
+      // MyPostsModal에서 게시글 삭제 시 이벤트 리스너
+      const onPostDeleted = (e: any) => {
+         try {
+            const { postId } = e?.detail || {}
+            if (!postId) return
+
+            // 홈화면의 posts 상태에서 해당 게시글 제거
+            setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId))
+         } catch (error) {
+            console.error('게시글 삭제 이벤트 처리 오류:', error)
+         }
+      }
+
+      // PostCheckModal에서 게시글 체크 시 이벤트 리스너
+      const onPostChecked = (e: any) => {
+         try {
+            const { postId, isChecked } = e?.detail || {}
+            if (!postId) return
+
+            // 홈화면의 posts 상태에서 해당 게시글 체크 상태 업데이트
+            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked } : post)))
+         } catch (error) {
+            console.error('게시글 체크 이벤트 처리 오류:', error)
+         }
+      }
+
+      // PostCheckModal에서 게시글 책갈피 시 이벤트 리스너
+      const onPostBookmarked = (e: any) => {
+         try {
+            const { postId, isBookmarked } = e?.detail || {}
+            if (!postId) return
+
+            // 홈화면의 posts 상태에서 해당 게시글 책갈피 상태 업데이트
+            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked } : post)))
+         } catch (error) {
+            console.error('게시글 책갈피 이벤트 처리 오류:', error)
+         }
+      }
+
       if (typeof window !== 'undefined') {
          window.addEventListener('connections:updated', onConnectionsUpdated)
          window.addEventListener('myposts:show', onMyPostsShow as EventListener)
+         window.addEventListener('post:updated', onPostUpdated as EventListener)
+         window.addEventListener('post:deleted', onPostDeleted as EventListener)
+         window.addEventListener('post:checked', onPostChecked as EventListener)
+         window.addEventListener('post:bookmarked', onPostBookmarked as EventListener)
       }
       return () => {
          if (typeof window !== 'undefined') {
             window.removeEventListener('connections:updated', onConnectionsUpdated)
             window.removeEventListener('myposts:show', onMyPostsShow as EventListener)
+            window.removeEventListener('post:updated', onPostUpdated as EventListener)
+            window.removeEventListener('post:deleted', onPostDeleted as EventListener)
+            window.removeEventListener('post:checked', onPostChecked as EventListener)
+            window.removeEventListener('post:bookmarked', onPostBookmarked as EventListener)
          }
       }
    }, [userNickname]) // userNickname이 변경될 때마다 useEffect 실행
@@ -884,13 +945,12 @@ const Fab = styled.button`
    position: fixed;
    right: var(--safe-x);
    bottom: var(--safe-x);
-   width: 72px;
-   height: 72px;
+   width: 60px;
+   height: 60px;
    border-radius: 50%;
    display: grid;
    place-items: center;
-   font-size: 24px;
-   font-weight: 300;
+   font-size: 20px;
    color: white;
    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
    border: none;

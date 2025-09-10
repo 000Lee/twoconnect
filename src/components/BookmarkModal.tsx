@@ -2,8 +2,13 @@
 
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
-import PostModal from './PostModal'
 import CommentModal from './CommentModal'
+import PostModal from './PostModal'
+
+interface BookmarkModalProps {
+   isOpen: boolean
+   onClose: () => void
+}
 
 interface ConnectionItem {
    connection_id: number
@@ -13,16 +18,28 @@ interface ConnectionItem {
    created_at: string
 }
 
-interface MyPostsModalProps {
-   isOpen: boolean
-   onClose: () => void
+interface AuthorItem {
+   nickname: string
+   userId: string
 }
 
-export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
+interface Post {
+   id: number
+   content: string
+   image_url?: string
+   created_at: string
+   user_id: string
+   nickname: string
+   isChecked?: boolean
+   isBookmarked?: boolean
+}
+
+export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
    const [connections, setConnections] = useState<ConnectionItem[]>([])
+   const [authors, setAuthors] = useState<AuthorItem[]>([])
    const [loading, setLoading] = useState(false)
-   const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
-   const [myPosts, setMyPosts] = useState<any[]>([])
+   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null)
+   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([])
    const [postsLoading, setPostsLoading] = useState(false)
    const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
    const [selectedPostForComment, setSelectedPostForComment] = useState<any>(null)
@@ -34,43 +51,140 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
       const nickname = localStorage.getItem('user_nickname')
       if (!nickname) return
       setLoading(true)
+
+      // 연결된 친구 목록 가져오기
       fetch(`/api/connections?userId=${nickname}`)
          .then((res) => res.json())
          .then((result) => {
-            if (result.success) setConnections(result.connections || [])
+            if (result.success) {
+               setConnections(result.connections || [])
+
+               // 모든 친구들과의 피드에서 글 작성자 목록 추출
+               const friendIds = result.connections?.map((conn: any) => conn.friend_id) || []
+               const allFriendIds = [nickname, ...friendIds] // 본인 + 친구들
+
+               // 각 친구와의 피드에서 게시글 조회하여 작성자 목록 생성
+               Promise.all(
+                  allFriendIds.map((friendId) =>
+                     fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
+                        .then((res) => res.json())
+                        .then((result) => (result.success ? result.posts : []))
+                  )
+               ).then((allPosts) => {
+                  // 모든 게시글을 하나의 배열로 합치기
+                  const flatPosts = allPosts.flat()
+
+                  // 중복 제거 (같은 ID를 가진 게시글 제거)
+                  const uniquePosts = flatPosts.reduce((acc: any[], post: any) => {
+                     if (!acc.find((p) => p.id === post.id)) {
+                        acc.push(post)
+                     }
+                     return acc
+                  }, [])
+
+                  // 고유한 작성자 목록 생성 (모든 작성자 포함)
+                  const uniqueAuthors = Array.from(new Set(uniquePosts.map((post: any) => post.nickname))).map((nickname) => ({ nickname, userId: nickname }))
+
+                  setAuthors(uniqueAuthors)
+               })
+            }
          })
          .finally(() => setLoading(false))
    }, [isOpen])
 
-   const handleSelectFriend = async (friendId: string) => {
-      setSelectedFriend(friendId)
+   const handleSelectAuthor = async (authorNickname: string) => {
+      setSelectedAuthor(authorNickname)
       setPostsLoading(true)
 
       try {
          const nickname = localStorage.getItem('user_nickname')
          if (!nickname) return
 
-         const response = await fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
-         const result = await response.json()
+         // 모든 친구들과의 피드에서 해당 작성자가 올린 글만 가져오기
+         const friendIds = connections.map((conn) => conn.friend_id)
+         const allFriendIds = [nickname, ...friendIds] // 본인 + 친구들
 
-         if (result.success) {
-            // 내가 쓴 글만 필터링
-            const onlyMine = result.posts.filter((post: any) => post.nickname === nickname)
-            setMyPosts(onlyMine)
+         // 각 친구와의 피드에서 게시글 조회
+         const allPostsResponses = await Promise.all(
+            allFriendIds.map((friendId) =>
+               fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
+                  .then((res) => res.json())
+                  .then((result) => (result.success ? result.posts : []))
+            )
+         )
+
+         // 모든 게시글을 하나의 배열로 합치고 해당 작성자의 글만 필터링
+         const allPosts = allPostsResponses.flat()
+
+         // 중복 제거 (같은 ID를 가진 게시글 제거)
+         const uniquePosts = allPosts.reduce((acc: any[], post: any) => {
+            if (!acc.find((p) => p.id === post.id)) {
+               acc.push(post)
+            }
+            return acc
+         }, [])
+
+         const authorPosts = uniquePosts.filter((post: any) => post.nickname === authorNickname)
+
+         if (authorPosts.length > 0) {
+            // 체크/책갈피 상태를 확인하여 책갈피된 게시물만 필터링
+            const bookmarkedPostsWithStatus = await Promise.all(
+               authorPosts.map(async (post: any) => {
+                  // 체크 상태 조회
+                  let isChecked = false
+                  try {
+                     const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
+                        headers: {
+                           'x-user-nickname': nickname,
+                        },
+                     })
+                     const checkResult = await checkResponse.json()
+                     if (checkResult.success) {
+                        isChecked = checkResult.isChecked
+                     }
+                  } catch (error) {
+                     console.error('체크 상태 조회 오류:', error)
+                  }
+
+                  // 책갈피 상태 조회
+                  let isBookmarked = false
+                  try {
+                     const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
+                        headers: {
+                           'x-user-nickname': nickname,
+                        },
+                     })
+                     const bookmarkResult = await bookmarkResponse.json()
+                     if (bookmarkResult.success) {
+                        isBookmarked = bookmarkResult.isBookmarked
+                     }
+                  } catch (error) {
+                     console.error('책갈피 상태 조회 오류:', error)
+                  }
+
+                  return {
+                     ...post,
+                     isChecked,
+                     isBookmarked,
+                  }
+               })
+            )
+
+            // 책갈피된 게시물만 필터링
+            const bookmarkedPosts = bookmarkedPostsWithStatus.filter((post: any) => post.isBookmarked)
+            setBookmarkedPosts(bookmarkedPosts)
+         } else {
+            setBookmarkedPosts([])
          }
       } catch (error) {
-         console.error('내가쓴글 조회 오류:', error)
+         console.error('책갈피된 게시물 조회 오류:', error)
+         setBookmarkedPosts([])
       } finally {
          setPostsLoading(false)
       }
    }
 
-   const handleBackToList = () => {
-      setSelectedFriend(null)
-      setMyPosts([])
-   }
-
-   const handleCheckPost = async (postId: number) => {
+   const handlePostCheck = async (postId: number) => {
       try {
          console.log('=== 포스트 체크/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
@@ -92,7 +206,20 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
 
             // 체크 상태에 따라 게시글 상태 업데이트
             const newCheckedState = result.action === 'checked'
-            setMyPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked: newCheckedState } : post)))
+
+            setBookmarkedPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked: newCheckedState } : post)))
+
+            // 홈화면에 체크 완료 이벤트 전송
+            if (typeof window !== 'undefined') {
+               window.dispatchEvent(
+                  new CustomEvent('post:checked', {
+                     detail: {
+                        postId: postId,
+                        isChecked: newCheckedState,
+                     },
+                  })
+               )
+            }
          } else {
             console.error('포스트 체크/해제 실패:', result.error)
             alert('게시글 체크/해제에 실패했습니다: ' + result.error)
@@ -125,7 +252,25 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
 
             // 책갈피 상태에 따라 게시글 상태 업데이트
             const newBookmarkedState = result.action === 'bookmarked'
-            setMyPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked: newBookmarkedState } : post)))
+
+            setBookmarkedPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked: newBookmarkedState } : post)))
+
+            // 홈화면에 책갈피 완료 이벤트 전송
+            if (typeof window !== 'undefined') {
+               window.dispatchEvent(
+                  new CustomEvent('post:bookmarked', {
+                     detail: {
+                        postId: postId,
+                        isBookmarked: newBookmarkedState,
+                     },
+                  })
+               )
+            }
+
+            // 책갈피 해제된 게시물은 목록에서 제거
+            if (!newBookmarkedState) {
+               setBookmarkedPosts((prev) => prev.filter((post) => post.id !== postId))
+            }
          } else {
             console.error('포스트 책갈피/해제 실패:', result.error)
             alert('게시글 책갈피/해제에 실패했습니다: ' + result.error)
@@ -136,8 +281,8 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
       }
    }
 
-   const handleOpenCommentModal = (postId: number, content: string) => {
-      setSelectedPostForComment({ id: postId, content })
+   const handleOpenCommentModal = (postId: number, postContent: string) => {
+      setSelectedPostForComment({ id: postId, content: postContent })
       setIsCommentModalOpen(true)
    }
 
@@ -163,16 +308,6 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          const userId = localStorage.getItem('user_id')
          if (!userNickname || !userId) return
 
-         console.log('API 요청 데이터:', {
-            url: `/api/posts/${updatedPost.id}`,
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
-            body: {
-               content: updatedPost.content,
-               imageFile: updatedPost.imageUrl ? { data: updatedPost.imageUrl } : null,
-            },
-         })
-
          const response = await fetch(`/api/posts/${updatedPost.id}`, {
             method: 'PUT',
             headers: {
@@ -192,59 +327,76 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                try {
                   const userNickname = localStorage.getItem('user_nickname')
                   if (userNickname) {
-                     const fetchResponse = await fetch(`/api/posts?userId=${userNickname}&friendId=${selectedFriend}`)
-                     const fetchResult = await fetchResponse.json()
+                     const friendIds = connections.map((conn) => conn.friend_id)
+                     const allFriendIds = [userNickname, ...friendIds]
 
-                     if (fetchResult.success) {
-                        const updatedPostData = fetchResult.posts.find((post: any) => post.id === updatedPost.id)
-                        if (updatedPostData) {
-                           // 실제 데이터베이스에서 가져온 최신 데이터로 업데이트
-                           const actualImageUrl = updatedPostData.image_url || 'https://picsum.photos/seed/default/800/480'
+                     const allPostsResponses = await Promise.all(
+                        allFriendIds.map((friendId) =>
+                           fetch(`/api/posts?userId=${userNickname}&friendId=${friendId}`)
+                              .then((res) => res.json())
+                              .then((result) => (result.success ? result.posts : []))
+                        )
+                     )
 
-                           // 게시물 목록에서 수정된 게시물 업데이트
-                           setMyPosts((prev) =>
-                              prev.map((post) =>
-                                 post.id === updatedPost.id
-                                    ? {
-                                         ...post,
-                                         content: updatedPostData.content,
-                                         imageUrl: actualImageUrl,
-                                      }
-                                    : post
-                              )
-                           )
-
-                           // 홈화면에 수정 완료 이벤트 전송
-                           if (typeof window !== 'undefined') {
-                              window.dispatchEvent(
-                                 new CustomEvent('post:updated', {
-                                    detail: {
-                                       postId: updatedPost.id,
-                                       content: updatedPostData.content,
-                                       imageUrl: actualImageUrl,
-                                    },
-                                 })
-                              )
-                           }
+                     const allPosts = allPostsResponses.flat()
+                     const uniquePosts = allPosts.reduce((acc: any[], post: any) => {
+                        if (!acc.find((p) => p.id === post.id)) {
+                           acc.push(post)
                         }
+                        return acc
+                     }, [])
+
+                     const authorPosts = uniquePosts.filter((post: any) => post.nickname === userNickname)
+
+                     if (authorPosts.length > 0) {
+                        const bookmarkedPostsWithStatus = await Promise.all(
+                           authorPosts.map(async (post: any) => {
+                              let isChecked = false
+                              let isBookmarked = false
+
+                              try {
+                                 const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
+                                    headers: { 'x-user-nickname': userNickname },
+                                 })
+                                 const checkResult = await checkResponse.json()
+                                 if (checkResult.success) isChecked = checkResult.isChecked
+                              } catch (error) {
+                                 console.error('체크 상태 조회 오류:', error)
+                              }
+
+                              try {
+                                 const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
+                                    headers: { 'x-user-nickname': userNickname },
+                                 })
+                                 const bookmarkResult = await bookmarkResponse.json()
+                                 if (bookmarkResult.success) isBookmarked = bookmarkResult.isBookmarked
+                              } catch (error) {
+                                 console.error('책갈피 상태 조회 오류:', error)
+                              }
+
+                              return { ...post, isChecked, isBookmarked }
+                           })
+                        )
+
+                        const bookmarkedPosts = bookmarkedPostsWithStatus.filter((post: any) => post.isBookmarked)
+                        setBookmarkedPosts(bookmarkedPosts)
                      }
                   }
                } catch (fetchError) {
                   console.error('수정된 포스트 조회 오류:', fetchError)
-                  // 조회 실패 시 기존 방식으로 폴백
-                  setMyPosts((prev) => prev.map((post) => (post.id === updatedPost.id ? { ...post, content: updatedPost.content, imageUrl: updatedPost.imageUrl } : post)))
+               }
 
-                  if (typeof window !== 'undefined') {
-                     window.dispatchEvent(
-                        new CustomEvent('post:updated', {
-                           detail: {
-                              postId: updatedPost.id,
-                              content: updatedPost.content,
-                              imageUrl: updatedPost.imageUrl,
-                           },
-                        })
-                     )
-                  }
+               // 홈화면에 수정 완료 이벤트 전송
+               if (typeof window !== 'undefined') {
+                  window.dispatchEvent(
+                     new CustomEvent('post:updated', {
+                        detail: {
+                           postId: updatedPost.id,
+                           content: updatedPost.content,
+                           imageUrl: updatedPost.imageUrl,
+                        },
+                     })
+                  )
                }
 
                handleCloseEditModal()
@@ -260,7 +412,6 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          console.log('=== 포스트 삭제 시작 ===')
          console.log('삭제할 포스트 ID:', postId)
 
-         // 사용자 확인
          if (!confirm('정말로 이 포스트를 삭제하시겠습니까?')) {
             console.log('사용자가 삭제를 취소했습니다.')
             return
@@ -270,9 +421,6 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          const userId = localStorage.getItem('user_id')
          if (!userNickname || !userId) return
 
-         console.log('삭제 요청 사용자 ID:', userId)
-
-         // API 호출하여 포스트 삭제
          const response = await fetch(`/api/posts/${postId}`, {
             method: 'DELETE',
             headers: {
@@ -287,7 +435,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          if (result.success) {
             console.log('포스트 삭제 성공!')
             // 게시물 목록에서 삭제된 게시물 제거
-            setMyPosts((prev) => prev.filter((post) => post.id !== postId))
+            setBookmarkedPosts((prev) => prev.filter((post) => post.id !== postId))
 
             // 홈화면에 삭제 완료 이벤트 전송
             if (typeof window !== 'undefined') {
@@ -309,6 +457,11 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
       }
    }
 
+   const handleBackToList = () => {
+      setSelectedAuthor(null)
+      setBookmarkedPosts([])
+   }
+
    if (!isOpen) return null
 
    return (
@@ -316,38 +469,38 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          <ModalOverlay onClick={onClose}>
             <ModalContent onClick={(e) => e.stopPropagation()}>
                <ModalHeader>
-                  <ModalTitle>{selectedFriend ? '내가 쓴 글' : '내가 쓴 글 보기'}</ModalTitle>
+                  <ModalTitle>{selectedAuthor ? '책갈피된 게시물' : '글 작성자 선택'}</ModalTitle>
                   <CloseButton onClick={onClose}>&times;</CloseButton>
                </ModalHeader>
                <ModalBody>
-                  {!selectedFriend ? (
-                     // 친구 목록 화면
+                  {!selectedAuthor ? (
+                     // 글 작성자 목록 화면
                      <>
                         {loading ? (
                            <EmptyText>불러오는 중...</EmptyText>
-                        ) : connections.length === 0 ? (
-                           <EmptyText>연결된 친구가 없습니다.</EmptyText>
+                        ) : authors.length === 0 ? (
+                           <EmptyText>글을 작성한 사용자가 없습니다.</EmptyText>
                         ) : (
                            <List>
-                              {connections.map((c) => (
-                                 <ListItem key={c.connection_id} onClick={() => handleSelectFriend(c.friend_id)}>
-                                    {c.friend_nickname}
+                              {authors.map((author) => (
+                                 <ListItem key={author.userId} onClick={() => handleSelectAuthor(author.nickname)}>
+                                    {author.nickname}
                                  </ListItem>
                               ))}
                            </List>
                         )}
                      </>
                   ) : (
-                     // 내가 쓴 글 목록 화면
+                     // 책갈피된 게시물 목록 화면
                      <>
-                        <BackButton onClick={handleBackToList}>← 친구 목록으로</BackButton>
+                        <BackButton onClick={handleBackToList}>← 작성자 목록으로</BackButton>
                         {postsLoading ? (
-                           <EmptyText>글을 불러오는 중...</EmptyText>
-                        ) : myPosts.length === 0 ? (
-                           <EmptyText>해당 친구와의 피드에 쓴 글이 없습니다.</EmptyText>
+                           <EmptyText>게시물을 불러오는 중...</EmptyText>
+                        ) : bookmarkedPosts.length === 0 ? (
+                           <EmptyText>{selectedAuthor}님이 작성한 책갈피된 게시물이 없습니다.</EmptyText>
                         ) : (
                            <PostsList>
-                              {myPosts.map((post) => (
+                              {bookmarkedPosts.map((post) => (
                                  <PostCard key={post.id}>
                                     <PostHeader>
                                        <span>{post.nickname}</span>
@@ -366,7 +519,17 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                                     )}
                                     <PostBody>{post.content}</PostBody>
                                     <PostActions>
-                                       <div style={{ width: '40px' }}></div>
+                                       <a
+                                          onClick={() => handlePostCheck(post.id)}
+                                          style={{
+                                             opacity: post.nickname === localStorage.getItem('user_nickname') ? 0 : 1,
+                                             cursor: post.nickname === localStorage.getItem('user_nickname') ? 'default' : 'pointer',
+                                             color: post.isChecked ? '#6c5ce7' : '#4b5563',
+                                             fontWeight: post.isChecked ? '600' : '400',
+                                          }}
+                                       >
+                                          {post.isChecked ? '체크' : '체크'}
+                                       </a>
                                        <a
                                           onClick={() => handleBookmarkPost(post.id)}
                                           style={{
@@ -380,12 +543,16 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                                        <a onClick={() => handleOpenCommentModal(post.id, post.content)} style={{ cursor: 'pointer' }}>
                                           댓글
                                        </a>
-                                       <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>
-                                          삭제
-                                       </a>
-                                       <a onClick={() => handleEditPost(post)} style={{ cursor: 'pointer' }}>
-                                          수정
-                                       </a>
+                                       {post.nickname === localStorage.getItem('user_nickname') && (
+                                          <>
+                                             <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>
+                                                삭제
+                                             </a>
+                                             <a onClick={() => handleEditPost(post)} style={{ cursor: 'pointer' }}>
+                                                수정
+                                             </a>
+                                          </>
+                                       )}
                                     </PostActions>
                                  </PostCard>
                               ))}
@@ -526,7 +693,7 @@ const PostsList = styled.div`
 const PostCard = styled.article`
    width: 100%;
    display: grid;
-   grid-template-rows: auto auto 1fr;
+   grid-template-rows: auto auto 1fr auto;
    border: 1px solid #e5e7eb;
    border-radius: 12px;
    background: #fff;
@@ -560,10 +727,9 @@ const PostBody = styled.div`
 
 const PostActions = styled.div`
    display: flex;
-   gap: 20px;
-   padding: 16px;
-   border-top: 1px solid #e5e7eb;
-   font-size: 14px;
+   gap: 24px;
+   font-size: 13px;
+   padding: 12px 16px 16px;
    color: #4b5563;
 
    a {
