@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
+import { useAuth } from '@/contexts/AuthContext'
 import CommentModal from './CommentModal'
 import PostModal from './PostModal'
 
@@ -35,6 +36,7 @@ interface Post {
 }
 
 export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
+   const { user } = useAuth()
    const [connections, setConnections] = useState<ConnectionItem[]>([])
    const [authors, setAuthors] = useState<AuthorItem[]>([])
    const [loading, setLoading] = useState(false)
@@ -47,13 +49,11 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
    const [editingPost, setEditingPost] = useState<any>(null)
 
    useEffect(() => {
-      if (!isOpen) return
-      const nickname = localStorage.getItem('user_nickname')
-      if (!nickname) return
+      if (!isOpen || !user) return
       setLoading(true)
 
       // 연결된 친구 목록 가져오기
-      fetch(`/api/connections?userId=${nickname}`)
+      fetch(`/api/connections?userId=${user.nickname}`)
          .then((res) => res.json())
          .then((result) => {
             if (result.success) {
@@ -61,12 +61,12 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                // 모든 친구들과의 피드에서 글 작성자 목록 추출
                const friendIds = result.connections?.map((conn: any) => conn.friend_id) || []
-               const allFriendIds = [nickname, ...friendIds] // 본인 + 친구들
+               const allFriendIds = [user.nickname, ...friendIds] // 본인 + 친구들
 
                // 각 친구와의 피드에서 게시글 조회하여 작성자 목록 생성
                Promise.all(
                   allFriendIds.map((friendId) =>
-                     fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
+                     fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
                         .then((res) => res.json())
                         .then((result) => (result.success ? result.posts : []))
                   )
@@ -97,17 +97,16 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
       setPostsLoading(true)
 
       try {
-         const nickname = localStorage.getItem('user_nickname')
-         if (!nickname) return
+         if (!user) return
 
          // 모든 친구들과의 피드에서 해당 작성자가 올린 글만 가져오기
          const friendIds = connections.map((conn) => conn.friend_id)
-         const allFriendIds = [nickname, ...friendIds] // 본인 + 친구들
+         const allFriendIds = [user.nickname, ...friendIds] // 본인 + 친구들
 
          // 각 친구와의 피드에서 게시글 조회
          const allPostsResponses = await Promise.all(
             allFriendIds.map((friendId) =>
-               fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
+               fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
                   .then((res) => res.json())
                   .then((result) => (result.success ? result.posts : []))
             )
@@ -135,7 +134,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
                         headers: {
-                           'x-user-nickname': nickname,
+                           'x-user-nickname': user.nickname,
                         },
                      })
                      const checkResult = await checkResponse.json()
@@ -151,7 +150,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
                         headers: {
-                           'x-user-nickname': nickname,
+                           'x-user-nickname': user.nickname,
                         },
                      })
                      const bookmarkResult = await bookmarkResponse.json()
@@ -189,14 +188,13 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
          console.log('=== 포스트 체크/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
 
-         const userNickname = localStorage.getItem('user_nickname')
-         if (!userNickname) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}/check`, {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': user.nickname,
             },
          })
 
@@ -235,14 +233,13 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
          console.log('=== 포스트 책갈피/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
 
-         const userNickname = localStorage.getItem('user_nickname')
-         if (!userNickname) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}/bookmark`, {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': user.nickname,
             },
          })
 
@@ -304,15 +301,13 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
    const handleUpdatePost = async (updatedPost: any) => {
       try {
          console.log('수정 요청 데이터:', updatedPost)
-         const userNickname = localStorage.getItem('user_nickname')
-         const userId = localStorage.getItem('user_id')
-         if (!userNickname || !userId) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${updatedPost.id}`, {
             method: 'PUT',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userId,
+               'x-user-id': user.id,
             },
             body: JSON.stringify({
                content: updatedPost.content,
@@ -325,14 +320,13 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             if (result.success) {
                // 수정된 포스트를 다시 조회하여 최신 데이터 가져오기
                try {
-                  const userNickname = localStorage.getItem('user_nickname')
-                  if (userNickname) {
+                  if (user) {
                      const friendIds = connections.map((conn) => conn.friend_id)
-                     const allFriendIds = [userNickname, ...friendIds]
+                     const allFriendIds = [user.nickname, ...friendIds]
 
                      const allPostsResponses = await Promise.all(
                         allFriendIds.map((friendId) =>
-                           fetch(`/api/posts?userId=${userNickname}&friendId=${friendId}`)
+                           fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
                               .then((res) => res.json())
                               .then((result) => (result.success ? result.posts : []))
                         )
@@ -346,7 +340,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                         return acc
                      }, [])
 
-                     const authorPosts = uniquePosts.filter((post: any) => post.nickname === userNickname)
+                     const authorPosts = uniquePosts.filter((post: any) => post.nickname === user.nickname)
 
                      if (authorPosts.length > 0) {
                         const bookmarkedPostsWithStatus = await Promise.all(
@@ -356,7 +350,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                               try {
                                  const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                                    headers: { 'x-user-nickname': userNickname },
+                                    headers: { 'x-user-nickname': user.nickname },
                                  })
                                  const checkResult = await checkResponse.json()
                                  if (checkResult.success) isChecked = checkResult.isChecked
@@ -366,7 +360,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                               try {
                                  const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                                    headers: { 'x-user-nickname': userNickname },
+                                    headers: { 'x-user-nickname': user.nickname },
                                  })
                                  const bookmarkResult = await bookmarkResponse.json()
                                  if (bookmarkResult.success) isBookmarked = bookmarkResult.isBookmarked
@@ -417,15 +411,13 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             return
          }
 
-         const userNickname = localStorage.getItem('user_nickname')
-         const userId = localStorage.getItem('user_id')
-         if (!userNickname || !userId) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}`, {
             method: 'DELETE',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userId,
+               'x-user-id': user.id,
             },
          })
 
@@ -522,8 +514,8 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                                        <a
                                           onClick={() => handlePostCheck(post.id)}
                                           style={{
-                                             opacity: post.nickname === localStorage.getItem('user_nickname') ? 0 : 1,
-                                             cursor: post.nickname === localStorage.getItem('user_nickname') ? 'default' : 'pointer',
+                                             opacity: post.nickname === user?.nickname ? 0 : 1,
+                                             cursor: post.nickname === user?.nickname ? 'default' : 'pointer',
                                              color: post.isChecked ? '#6c5ce7' : '#4b5563',
                                              fontWeight: post.isChecked ? '600' : '400',
                                           }}
@@ -543,7 +535,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                                        <a onClick={() => handleOpenCommentModal(post.id, post.content)} style={{ cursor: 'pointer' }}>
                                           댓글
                                        </a>
-                                       {post.nickname === localStorage.getItem('user_nickname') && (
+                                       {post.nickname === user?.nickname && (
                                           <>
                                              <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>
                                                 삭제

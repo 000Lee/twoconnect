@@ -1,33 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import styled from 'styled-components'
+import { useAuth } from '@/contexts/AuthContext'
 import FriendRequestModal from './FriendRequestModal'
 import MyPostsModal from './MyPostsModal'
 import FriendManagementModal from './FriendManagementModal'
 import PostCheckModal from './PostCheckModal'
 import BookmarkModal from './BookmarkModal'
+import NoticeModal from './NoticeModal'
+import AdminModal from './AdminModal'
 
 export default function AppHeader() {
-   const [nickname, setNickname] = useState<string | null>(null)
+   const { user, logout, isAdmin } = useAuth()
    const [isDropdownOpen, setIsDropdownOpen] = useState(false)
    const [isFriendRequestModalOpen, setIsFriendRequestModalOpen] = useState(false)
    const [isMyPostsModalOpen, setIsMyPostsModalOpen] = useState(false)
    const [isFriendManagementModalOpen, setIsFriendManagementModalOpen] = useState(false)
    const [isPostCheckModalOpen, setIsPostCheckModalOpen] = useState(false)
    const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false)
+   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false)
+   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false)
 
-   useEffect(() => {
-      // localStorage에서 닉네임 확인
-      const savedNickname = localStorage.getItem('user_nickname')
-      if (savedNickname) {
-         setNickname(savedNickname)
-      }
-   }, [])
-
-   const handleLogout = () => {
-      localStorage.removeItem('user_nickname')
-      setNickname(null)
+   const handleLogout = async () => {
+      await logout()
       window.location.href = '/'
    }
 
@@ -52,8 +48,11 @@ export default function AppHeader() {
          setIsPostCheckModalOpen(true)
       } else if (menuType === '책갈피') {
          setIsBookmarkModalOpen(true)
+      } else if (menuType === '공지사항') {
+         setIsNoticeModalOpen(true)
+      } else if (menuType === 'Admin관리') {
+         setIsAdminModalOpen(true)
       }
-      // TODO: 다른 메뉴들에 따른 동작 구현
 
       closeDropdown()
    }
@@ -67,10 +66,10 @@ export default function AppHeader() {
                </TopLeft>
 
                <TopRight>
-                  {nickname ? (
+                  {user ? (
                      <UserSection>
                         <UserNickname onClick={toggleDropdown} style={{ cursor: 'pointer' }}>
-                           {nickname}님<DropdownArrow isOpen={isDropdownOpen}>▼</DropdownArrow>
+                           {user.nickname}님<DropdownArrow isOpen={isDropdownOpen}>▼</DropdownArrow>
                         </UserNickname>
 
                         {isDropdownOpen && (
@@ -80,10 +79,20 @@ export default function AppHeader() {
                               <DropdownItem onClick={() => handleMenuClick('체크')}>체크</DropdownItem>
                               <DropdownItem onClick={() => handleMenuClick('책갈피')}>책갈피</DropdownItem>
                               <DropdownItem onClick={() => handleMenuClick('내가쓴글')}>내가쓴글</DropdownItem>
+                              <DropdownItem onClick={() => handleMenuClick('공지사항')} style={{ color: '#3b82f6', fontWeight: '500' }}>
+                                 📢 공지사항
+                              </DropdownItem>
+                              {isAdmin && (
+                                 <DropdownItem onClick={() => handleMenuClick('Admin관리')} style={{ color: '#dc2626', fontWeight: '500' }}>
+                                    ⚙️ Admin관리
+                                 </DropdownItem>
+                              )}
+                              <DropdownDivider />
+                              <DropdownItem onClick={handleLogout} style={{ color: '#ef4444', fontWeight: '500' }}>
+                                 로그아웃
+                              </DropdownItem>
                            </DropdownMenu>
                         )}
-
-                        <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
                      </UserSection>
                   ) : (
                      <LoginLink as="a" href="/login" style={{ fontSize: '14px', fontWeight: '400', color: 'black', cursor: 'pointer' }}>
@@ -111,6 +120,12 @@ export default function AppHeader() {
 
          {/* 책갈피 모달 */}
          <BookmarkModal isOpen={isBookmarkModalOpen} onClose={() => setIsBookmarkModalOpen(false)} />
+
+         {/* 공지사항 모달 */}
+         <NoticeModal isOpen={isNoticeModalOpen} onClose={() => setIsNoticeModalOpen(false)} />
+
+         {/* Admin 관리 모달 */}
+         <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
       </HeaderWrap>
    )
 }
@@ -185,19 +200,6 @@ const LoginLink = styled.a`
    text-decoration: none;
 `
 
-const LogoutButton = styled.button`
-   background: none;
-   border: none;
-   font-size: 12px;
-   color: #666;
-   cursor: pointer;
-   text-decoration: underline;
-
-   &:hover {
-      color: #333;
-   }
-`
-
 const DropdownArrow = styled.span.withConfig({
    shouldForwardProp: (prop) => prop !== 'isOpen',
 })<{ isOpen: boolean }>`
@@ -230,6 +232,12 @@ const DropdownItem = styled.div`
    &:hover {
       background-color: #f0f0f0;
    }
+`
+
+const DropdownDivider = styled.div`
+   height: 1px;
+   background-color: #e0e0e0;
+   margin: 4px 0;
 `
 
 const DropdownOverlay = styled.div`

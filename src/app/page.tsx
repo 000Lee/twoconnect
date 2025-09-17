@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import styled from 'styled-components'
+import { useAuth } from '@/contexts/AuthContext'
 import PostModal from '@/components/PostModal'
 import FriendAddModal from '../components/FriendAddModal'
 import CommentModal from '../components/CommentModal'
@@ -12,6 +13,7 @@ const CONNECTION_COLORS = ['#FFCDB8', '#FFE9C0', '#E5FFBC', '#D3FFEA', '#D3DFFF'
 const getConnectionColor = (index: number) => CONNECTION_COLORS[index % CONNECTION_COLORS.length]
 
 export default function Home() {
+   const { user } = useAuth()
    const [isModalOpen, setIsModalOpen] = useState(false)
    const [isFriendModalOpen, setIsFriendModalOpen] = useState(false)
    const [isCommentModalOpen, setIsCommentModalOpen] = useState(false)
@@ -56,20 +58,18 @@ export default function Home() {
       }>
    >([])
    const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
-   const [userNickname, setUserNickname] = useState<string>('로그인')
-   const [userId, setUserId] = useState<string>('anonymous')
 
    // fetchPosts 함수 정의
    const fetchPosts = async () => {
       try {
-         // userNickname이 올바르게 설정되었는지 확인
-         if (userNickname === '로그인') {
+         // user가 없으면 데이터를 가져오지 않음
+         if (!user) {
             console.log('사용자가 로그인되지 않음, fetchPosts 건너뜀')
             return
          }
 
          // 본인의 게시글만 가져오기
-         const response = await fetch(`/api/posts?userId=${userNickname}`)
+         const response = await fetch(`/api/posts?userId=${user.nickname}`)
          const result = await response.json()
 
          if (result.success) {
@@ -99,23 +99,17 @@ export default function Home() {
       }
    }
 
-   // 컴포넌트 마운트 시 localStorage에서 사용자 정보 가져오기
+   // 사용자 정보가 변경될 때마다 실행
    useEffect(() => {
-      const nickname = localStorage.getItem('user_nickname') || '로그인'
-      const id = localStorage.getItem('user_id') || 'anonymous'
-      setUserNickname(nickname)
-      setUserId(id)
-
-      // userNickname이 올바르게 설정된 후에만 fetchPosts 호출
-      if (nickname !== '로그인') {
+      if (user) {
          fetchPosts()
-         fetchConnections(nickname)
+         fetchConnections(user.nickname)
       }
 
       // 친구 연결 목록 갱신 이벤트 리스너
       const onConnectionsUpdated = () => {
-         if (nickname !== '로그인') {
-            fetchConnections(nickname)
+         if (user) {
+            fetchConnections(user.nickname)
          }
       }
       // '내가쓴글' 모달에서 친구 선택 시 이벤트 리스너
@@ -198,7 +192,7 @@ export default function Home() {
             window.removeEventListener('post:bookmarked', onPostBookmarked as EventListener)
          }
       }
-   }, [userNickname]) // userNickname이 변경될 때마다 useEffect 실행
+   }, [user]) // user가 변경될 때마다 useEffect 실행
 
    const fetchConnections = async (userId: string) => {
       try {
@@ -233,7 +227,7 @@ export default function Home() {
    const fetchFriendPosts = async (friendId: string) => {
       try {
          // 선택된 친구와 본인의 게시글만 가져오기
-         const response = await fetch(`/api/posts?userId=${userNickname}&friendId=${friendId}`)
+         const response = await fetch(`/api/posts?userId=${user?.nickname}&friendId=${friendId}`)
          const result = await response.json()
 
          if (result.success) {
@@ -245,7 +239,7 @@ export default function Home() {
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
                         headers: {
-                           'x-user-nickname': userNickname,
+                           'x-user-nickname': user?.nickname || '',
                         },
                      })
                      const checkResult = await checkResponse.json()
@@ -261,7 +255,7 @@ export default function Home() {
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
                         headers: {
-                           'x-user-nickname': userNickname,
+                           'x-user-nickname': user?.nickname || '',
                         },
                      })
                      const bookmarkResult = await bookmarkResponse.json()
@@ -295,10 +289,10 @@ export default function Home() {
    // 특정 친구와의 피드에서 "내가 쓴 글"만 조회
    const fetchMyPostsWithFriend = async (friendId: string) => {
       try {
-         const response = await fetch(`/api/posts?userId=${userNickname}&friendId=${friendId}`)
+         const response = await fetch(`/api/posts?userId=${user?.nickname}&friendId=${friendId}`)
          const result = await response.json()
          if (result.success) {
-            const onlyMine = result.posts.filter((post: any) => post.nickname === userNickname)
+            const onlyMine = result.posts.filter((post: any) => post.nickname === user?.nickname)
 
             // 체크/책갈피 상태도 함께 조회
             const formattedPosts = onlyMine.map((post: any) => {
@@ -327,7 +321,7 @@ export default function Home() {
          console.log('받은 postData:', postData)
 
          // state에서 사용자 정보 가져오기
-         console.log('사용자 정보:', { userNickname, userId })
+         console.log('사용자 정보:', { userNickname: user?.nickname, userId: user?.id })
 
          // 이미지 파일을 Base64로 변환
          let imageData = null
@@ -368,8 +362,8 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
-               'x-user-id': userId,
+               'x-user-nickname': user?.nickname || '',
+               'x-user-id': user?.id || '',
             },
             body: JSON.stringify(requestBody),
          })
@@ -441,7 +435,7 @@ export default function Home() {
             method: 'PUT',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userId,
+               'x-user-id': user?.id || '',
             },
             body: JSON.stringify(requestBody),
          })
@@ -492,7 +486,7 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': user?.nickname || '',
             },
          })
 
@@ -528,7 +522,7 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': user?.nickname || '',
             },
          })
 
@@ -566,14 +560,14 @@ export default function Home() {
             return
          }
 
-         console.log('삭제 요청 사용자 ID:', userId)
+         console.log('삭제 요청 사용자 ID:', user?.id)
 
          // API 호출하여 포스트 삭제
          const response = await fetch(`/api/posts/${postId}`, {
             method: 'DELETE',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userId,
+               'x-user-id': user?.id || '',
             },
          })
 
@@ -599,7 +593,7 @@ export default function Home() {
          console.log('=== 친구 추가 시작 ===')
          console.log('추가할 친구 닉네임:', nickname)
 
-         if (!userNickname || userNickname === '로그인') {
+         if (!user) {
             throw new Error('로그인이 필요합니다.')
          }
 
@@ -608,7 +602,7 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userNickname,
+               'x-user-id': user?.id,
             },
             body: JSON.stringify({ friendNickname: nickname }),
          })
@@ -619,7 +613,7 @@ export default function Home() {
          if (result.success) {
             console.log('친구 추가 성공!')
             // 성공 시 친구 목록 새로고침
-            fetchConnections(userNickname)
+            fetchConnections(user?.nickname || '')
             alert('친구 연결 요청을 보냈습니다.')
          } else {
             console.error('친구 추가 실패:', result.error)
@@ -643,7 +637,7 @@ export default function Home() {
 
             <Safe>
                {/* 로그인된 상태일 때만 Header 표시 */}
-               {userNickname !== '로그인' && (
+               {user && (
                   <Header>
                      <Chip style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', fontWeight: '600' }}>Connected</Chip>
                      <Chips>
@@ -658,7 +652,7 @@ export default function Home() {
                            }}
                            onClick={() => handleFriendSelect(null)}
                         >
-                           {userNickname}
+                           {user?.nickname}
                         </Chip>
 
                         {/* 연결된 친구들 */}
@@ -697,7 +691,7 @@ export default function Home() {
                )}
 
                {/* 로그인 안된 상태일 때 TwoConnect 소개 페이지 표시 */}
-               {userNickname === '로그인' ? (
+               {!user ? (
                   <IntroSection>
                      <IntroContent>
                         <IntroTitle>
@@ -741,8 +735,8 @@ export default function Home() {
                                  <a
                                     onClick={() => handleCheckPost(post.id)}
                                     style={{
-                                       opacity: post.title === userNickname ? 0 : 1,
-                                       cursor: post.title === userNickname ? 'default' : 'pointer',
+                                       opacity: post.title === user?.nickname ? 0 : 1,
+                                       cursor: post.title === user?.nickname ? 'default' : 'pointer',
                                        color: post.isChecked ? '#6c5ce7' : '#4b5563',
                                        fontWeight: post.isChecked ? '600' : '400',
                                     }}
@@ -762,7 +756,7 @@ export default function Home() {
                                  <a onClick={() => handleOpenCommentModal(post.id, post.content)} style={{ cursor: 'pointer' }}>
                                     댓글
                                  </a>
-                                 {post.title === userNickname && (
+                                 {post.title === user?.nickname && (
                                     <>
                                        <a onClick={() => handleDeletePost(post.id)} style={{ cursor: 'pointer' }}>
                                           삭제
@@ -787,7 +781,7 @@ export default function Home() {
             <CommentModal isOpen={isCommentModalOpen} onClose={handleCloseCommentModal} postId={selectedPostForComment?.id || 0} postContent={selectedPostForComment?.content || ''} />
 
             {/* 로그인된 상태일 때만 글쓰기 버튼 표시 */}
-            {userNickname !== '로그인' && (
+            {user && (
                <Fab aria-label="새 글" onClick={() => setIsModalOpen(true)}>
                   <svg
                      viewBox="0 0 24 24"

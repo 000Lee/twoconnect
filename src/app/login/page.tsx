@@ -37,13 +37,6 @@ export default function LoginPage() {
             const data = await response.json()
 
             if (data.success) {
-               // 로그인 성공 시 닉네임과 user_id를 localStorage에 저장
-               if (data.nickname) {
-                  localStorage.setItem('user_nickname', data.nickname)
-               }
-               if (data.user_id) {
-                  localStorage.setItem('user_id', data.user_id)
-               }
                setSuccess('로그인 성공! 메인 페이지로 이동합니다...')
                setTimeout(() => {
                   window.location.href = '/'
@@ -74,13 +67,6 @@ export default function LoginPage() {
             const data = await response.json()
 
             if (data.success) {
-               // 회원가입 성공 시 user_id와 닉네임을 localStorage에 저장
-               if (data.user_id) {
-                  localStorage.setItem('user_id', data.user_id)
-               }
-               if (data.nickname) {
-                  localStorage.setItem('user_nickname', data.nickname)
-               }
                setSuccess('회원가입 성공! 로그인해주세요.')
                setIsLogin(true)
                setEmail('')
@@ -112,73 +98,37 @@ export default function LoginPage() {
                {error && <ErrorMessage>{error}</ErrorMessage>}
                {success && <SuccessMessage>{success}</SuccessMessage>}
 
-                               <Field>
-                   <Label htmlFor="email">이메일</Label>
-                   <Input 
-                      id="email" 
-                      name="email" 
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="이메일을 입력하세요" 
-                      autoComplete="email" 
-                      required
-                   />
-                </Field>
+               <Field>
+                  <Label htmlFor="email">이메일</Label>
+                  <Input id="email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일을 입력하세요" autoComplete="email" required />
+               </Field>
 
-                {!isLogin && (
-                   <Field>
-                      <Label htmlFor="nickname">닉네임</Label>
-                      <Input 
-                         id="nickname" 
-                         name="nickname" 
-                         type="text"
-                         value={nickname}
-                         onChange={(e) => setNickname(e.target.value)}
-                         placeholder="닉네임을 입력하세요" 
-                         autoComplete="nickname" 
-                         required
-                      />
-                   </Field>
-                )}
+               {!isLogin && (
+                  <Field>
+                     <Label htmlFor="nickname">닉네임</Label>
+                     <Input id="nickname" name="nickname" type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="닉네임을 입력하세요" autoComplete="nickname" required />
+                  </Field>
+               )}
 
                <Field>
                   <Label htmlFor="password">비밀번호</Label>
-                  <Input 
-                     id="password" 
-                     name="password" 
-                     type="password" 
-                     value={password}
-                     onChange={(e) => setPassword(e.target.value)}
-                     placeholder="비밀번호를 입력하세요" 
-                     autoComplete="current-password" 
-                     required
-                  />
+                  <Input id="password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" autoComplete="current-password" required />
                </Field>
 
                {!isLogin && (
                   <Field>
                      <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-                     <Input 
-                        id="confirmPassword" 
-                        name="confirmPassword" 
-                        type="password" 
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="비밀번호를 다시 입력하세요" 
-                        autoComplete="new-password" 
-                        required
-                     />
+                     <Input id="confirmPassword" name="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호를 다시 입력하세요" autoComplete="new-password" required />
                   </Field>
                )}
 
                <PrimaryButton type="submit" disabled={loading}>
-                  {loading ? '처리중...' : (isLogin ? '로그인' : '회원가입')}
+                  {loading ? '처리중...' : isLogin ? '로그인' : '회원가입'}
                </PrimaryButton>
 
                <Actions>
-                  <ActionButton 
-                     type="button" 
+                  <ActionButton
+                     type="button"
                      onClick={() => {
                         setIsLogin(!isLogin)
                         setError('')
@@ -321,7 +271,7 @@ const PrimaryButton = styled.button`
    &:active:not(:disabled) {
       transform: translateY(1px);
    }
-   
+
    &:disabled {
       background: #999;
       cursor: not-allowed;
