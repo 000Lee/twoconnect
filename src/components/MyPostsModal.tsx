@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import PostModal from './PostModal'
 import CommentModal from './CommentModal'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ConnectionItem {
    connection_id: number
@@ -19,6 +20,7 @@ interface MyPostsModalProps {
 }
 
 export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
+   const { user } = useAuth()
    const [connections, setConnections] = useState<ConnectionItem[]>([])
    const [loading, setLoading] = useState(false)
    const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
@@ -30,32 +32,29 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
    const [editingPost, setEditingPost] = useState<any>(null)
 
    useEffect(() => {
-      if (!isOpen) return
-      const nickname = localStorage.getItem('user_nickname')
-      if (!nickname) return
+      if (!isOpen || !user) return
       setLoading(true)
-      fetch(`/api/connections?userId=${nickname}`)
+      fetch(`/api/connections`, { credentials: 'include' })
          .then((res) => res.json())
          .then((result) => {
             if (result.success) setConnections(result.connections || [])
          })
          .finally(() => setLoading(false))
-   }, [isOpen])
+   }, [isOpen, user])
 
    const handleSelectFriend = async (friendId: string) => {
       setSelectedFriend(friendId)
       setPostsLoading(true)
 
       try {
-         const nickname = localStorage.getItem('user_nickname')
-         if (!nickname) return
+         if (!user) return
 
-         const response = await fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
+         const response = await fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
          const result = await response.json()
 
          if (result.success) {
             // 내가 쓴 글만 필터링
-            const onlyMine = result.posts.filter((post: any) => post.nickname === nickname)
+            const onlyMine = result.posts.filter((post: any) => post.nickname === user.nickname)
             setMyPosts(onlyMine)
          }
       } catch (error) {
@@ -75,14 +74,12 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          console.log('=== 포스트 체크/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
 
-         const userNickname = localStorage.getItem('user_nickname')
-         if (!userNickname) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}/check`, {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
             },
          })
 
@@ -108,14 +105,12 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          console.log('=== 포스트 책갈피/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
 
-         const userNickname = localStorage.getItem('user_nickname')
-         if (!userNickname) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}/bookmark`, {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
             },
          })
 
@@ -159,9 +154,8 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
    const handleUpdatePost = async (updatedPost: any) => {
       try {
          console.log('수정 요청 데이터:', updatedPost)
-         const userNickname = localStorage.getItem('user_nickname')
-         const userId = localStorage.getItem('user_id')
-         if (!userNickname || !userId) return
+         const userId = user?.id
+         if (!userId) return
 
          console.log('API 요청 데이터:', {
             url: `/api/posts/${updatedPost.id}`,
@@ -190,9 +184,8 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             if (result.success) {
                // 수정된 포스트를 다시 조회하여 최신 데이터 가져오기
                try {
-                  const userNickname = localStorage.getItem('user_nickname')
-                  if (userNickname) {
-                     const fetchResponse = await fetch(`/api/posts?userId=${userNickname}&friendId=${selectedFriend}`)
+                  if (user?.nickname) {
+                     const fetchResponse = await fetch(`/api/posts?userId=${user.nickname}&friendId=${selectedFriend}`)
                      const fetchResult = await fetchResponse.json()
 
                      if (fetchResult.success) {

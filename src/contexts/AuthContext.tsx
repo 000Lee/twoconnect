@@ -28,9 +28,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    // 인증 상태 확인
    const checkAuth = async () => {
       try {
+         console.log('🔐 인증 상태 확인 시작')
          const response = await fetch('/api/auth/me', {
             credentials: 'include', // 쿠키 포함
          })
+
+         console.log('🔐 인증 API 응답:', response.status, response.statusText)
 
          if (response.ok) {
             const userData = await response.json()

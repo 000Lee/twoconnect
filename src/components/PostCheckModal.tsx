@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import CommentModal from './CommentModal'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface PostCheckModalProps {
    isOpen: boolean
@@ -30,6 +31,7 @@ interface Post {
 }
 
 export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps) {
+   const { user } = useAuth()
    const [connections, setConnections] = useState<ConnectionItem[]>([])
    const [loading, setLoading] = useState(false)
    const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
@@ -39,32 +41,29 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
    const [selectedPostForComment, setSelectedPostForComment] = useState<any>(null)
 
    useEffect(() => {
-      if (!isOpen) return
-      const nickname = localStorage.getItem('user_nickname')
-      if (!nickname) return
+      if (!isOpen || !user) return
       setLoading(true)
-      fetch(`/api/connections?userId=${nickname}`)
+      fetch(`/api/connections`, { credentials: 'include' })
          .then((res) => res.json())
          .then((result) => {
             if (result.success) setConnections(result.connections || [])
          })
          .finally(() => setLoading(false))
-   }, [isOpen])
+   }, [isOpen, user])
 
    const handleSelectFriend = async (friendId: string) => {
       setSelectedFriend(friendId)
       setPostsLoading(true)
 
       try {
-         const nickname = localStorage.getItem('user_nickname')
-         if (!nickname) return
+         if (!user) return
 
-         const response = await fetch(`/api/posts?userId=${nickname}&friendId=${friendId}`)
+         const response = await fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
          const result = await response.json()
 
          if (result.success) {
             // 친구가 쓴 글만 필터링
-            const friendPosts = result.posts.filter((post: any) => post.nickname !== nickname)
+            const friendPosts = result.posts.filter((post: any) => post.nickname !== user.nickname)
 
             if (friendPosts.length > 0) {
                // 체크 상태를 확인하여 읽지 않은 게시물만 필터링
@@ -73,11 +72,7 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
                      // 체크 상태 조회
                      let isChecked = false
                      try {
-                        const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                           headers: {
-                              'x-user-nickname': nickname,
-                           },
-                        })
+                        const checkResponse = await fetch(`/api/posts/${post.id}/check`)
                         const checkResult = await checkResponse.json()
                         if (checkResult.success) {
                            isChecked = checkResult.isChecked
@@ -89,11 +84,7 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
                      // 책갈피 상태 조회
                      let isBookmarked = false
                      try {
-                        const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                           headers: {
-                              'x-user-nickname': nickname,
-                           },
-                        })
+                        const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`)
                         const bookmarkResult = await bookmarkResponse.json()
                         if (bookmarkResult.success) {
                            isBookmarked = bookmarkResult.isBookmarked
@@ -130,14 +121,12 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
          console.log('=== 포스트 체크/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
 
-         const userNickname = localStorage.getItem('user_nickname')
-         if (!userNickname) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}/check`, {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
             },
          })
 
@@ -181,14 +170,12 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
          console.log('=== 포스트 책갈피/해제 시작 ===')
          console.log('처리할 포스트 ID:', postId)
 
-         const userNickname = localStorage.getItem('user_nickname')
-         if (!userNickname) return
+         if (!user) return
 
          const response = await fetch(`/api/posts/${postId}/bookmark`, {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
             },
          })
 

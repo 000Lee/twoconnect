@@ -145,7 +145,7 @@ export default function NoticeModal({ isOpen, onClose }: NoticeModalProps) {
                         notices.map((notice) => (
                            <NoticeItem key={notice.id} onClick={() => handleNoticeClick(notice)}>
                               <NoticeItemHeader>
-                                 <NoticeItemTitle isImportant={notice.is_important}>
+                                 <NoticeItemTitle $isImportant={notice.is_important}>
                                     {notice.is_important && '🔔 '}
                                     {notice.title}
                                  </NoticeItemTitle>
@@ -299,11 +299,11 @@ const NoticeItemHeader = styled.div`
    margin-bottom: 8px;
 `
 
-const NoticeItemTitle = styled.h3<{ isImportant: boolean }>`
+const NoticeItemTitle = styled.h3<{ $isImportant: boolean }>`
    margin: 0;
    font-size: 16px;
    font-weight: 600;
-   color: ${(props) => (props.isImportant ? '#dc2626' : '#1f2937')};
+   color: ${(props) => (props.$isImportant ? '#dc2626' : '#1f2937')};
    flex: 1;
    margin-right: 12px;
 `

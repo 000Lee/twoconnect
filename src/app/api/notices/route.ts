@@ -25,19 +25,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
    try {
-      // 쿠키에서 user_id 가져오기
-      const userId = request.cookies.get('user_id')?.value
+      const supabase = createServerSupabaseClient()
 
-      if (!userId) {
+      // Supabase 인증 확인
+      const {
+         data: { user },
+         error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
-      const supabase = createServerSupabaseClient()
-
       // Admin 권한 확인
-      const { data: user, error: userError } = await supabase.from('users').select('is_admin').eq('id', userId).single()
+      const { data: userData, error: userError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
 
-      if (userError || !user?.is_admin) {
+      if (userError || !userData?.is_admin) {
          return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 })
       }
 
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
             title,
             content,
             is_important: is_important || false,
-            created_by: userId,
+            created_by: user.id,
          })
          .select()
          .single()
@@ -76,19 +79,22 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
    try {
-      // 쿠키에서 user_id 가져오기
-      const userId = request.cookies.get('user_id')?.value
+      const supabase = createServerSupabaseClient()
 
-      if (!userId) {
+      // Supabase 인증 확인
+      const {
+         data: { user },
+         error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
-      const supabase = createServerSupabaseClient()
-
       // Admin 권한 확인
-      const { data: user, error: userError } = await supabase.from('users').select('is_admin').eq('id', userId).single()
+      const { data: userData, error: userError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
 
-      if (userError || !user?.is_admin) {
+      if (userError || !userData?.is_admin) {
          return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 })
       }
 
@@ -127,19 +133,22 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
    try {
-      // 쿠키에서 user_id 가져오기
-      const userId = request.cookies.get('user_id')?.value
+      const supabase = createServerSupabaseClient()
 
-      if (!userId) {
+      // Supabase 인증 확인
+      const {
+         data: { user },
+         error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
-      const supabase = createServerSupabaseClient()
-
       // Admin 권한 확인
-      const { data: user, error: userError } = await supabase.from('users').select('is_admin').eq('id', userId).single()
+      const { data: userData, error: userError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
 
-      if (userError || !user?.is_admin) {
+      if (userError || !userData?.is_admin) {
          return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 })
       }
 

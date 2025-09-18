@@ -197,7 +197,9 @@ export default function Home() {
    const fetchConnections = async (userId: string) => {
       try {
          console.log('fetchConnections 호출됨, userId:', userId)
-         const response = await fetch(`/api/connections?userId=${userId}`)
+         const response = await fetch('/api/connections', {
+            credentials: 'include',
+         })
          const result = await response.json()
 
          console.log('API 응답:', result)
@@ -214,10 +216,11 @@ export default function Home() {
    }
 
    const handleFriendSelect = (friendId: string | null) => {
+      console.log('👆 친구 선택:', { friendId, userNickname: user?.nickname })
       setSelectedFriend(friendId)
-      // 선택된 친구와의 피드 로드
+      // 선택된 친구와의 피드 로드 (상대방과 내 게시글 함께)
       if (friendId) {
-         fetchFriendPosts(friendId)
+         fetchMyPostsWithFriend(friendId)
       } else {
          // 본인의 피드로 돌아가기
          fetchPosts()
@@ -286,16 +289,22 @@ export default function Home() {
       }
    }
 
-   // 특정 친구와의 피드에서 "내가 쓴 글"만 조회
+   // 특정 친구와의 피드에서 상대방과 내 게시글 모두 조회
    const fetchMyPostsWithFriend = async (friendId: string) => {
       try {
+         console.log('🔍 fetchMyPostsWithFriend 호출:', { userId: user?.nickname, friendId })
          const response = await fetch(`/api/posts?userId=${user?.nickname}&friendId=${friendId}`)
+         console.log('📡 API 응답 상태:', response.status)
          const result = await response.json()
+         console.log('📄 API 응답 데이터:', result)
+
          if (result.success) {
-            const onlyMine = result.posts.filter((post: any) => post.nickname === user?.nickname)
+            // 상대방과 내 게시글 모두 가져오기 (필터 제거)
+            const allPosts = result.posts
+            console.log('📝 가져온 게시글 수:', allPosts.length)
 
             // 체크/책갈피 상태도 함께 조회
-            const formattedPosts = onlyMine.map((post: any) => {
+            const formattedPosts = allPosts.map((post: any) => {
                return {
                   id: post.id,
                   title: post.nickname,
@@ -602,8 +611,8 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': user?.id,
             },
+            credentials: 'include',
             body: JSON.stringify({ friendNickname: nickname }),
          })
 
