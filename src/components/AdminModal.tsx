@@ -29,13 +29,13 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
          const result = await response.json()
 
          if (result.success) {
-            setMessage(`✅ ${result.message}`)
+            setMessage(` ${result.message}`)
             setEmail('')
          } else {
-            setMessage(`❌ ${result.error}`)
+            setMessage(` ${result.error}`)
          }
       } catch (error) {
-         setMessage('❌ 서버 오류가 발생했습니다.')
+         setMessage(' 서버 오류가 발생했습니다.')
       } finally {
          setLoading(false)
       }

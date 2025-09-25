@@ -82,14 +82,14 @@ export default function NoticeModal({ isOpen, onClose }: NoticeModalProps) {
          const result = await response.json()
 
          if (result.success) {
-            alert('✅ 공지사항이 삭제되었습니다.')
+            alert(' 공지사항이 삭제되었습니다.')
             fetchNotices() // 목록 새로고침
             setSelectedNotice(null) // 상세보기에서 목록으로 돌아가기
          } else {
-            alert(`❌ ${result.error}`)
+            alert(` ${result.error}`)
          }
       } catch (error) {
-         alert('❌ 서버 오류가 발생했습니다.')
+         alert(' 서버 오류가 발생했습니다.')
       }
    }
 

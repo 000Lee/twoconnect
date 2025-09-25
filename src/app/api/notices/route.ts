@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient, setJwtClaims } from '@/lib/supabase'
+import { verifyJwt } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
    try {
@@ -27,22 +28,35 @@ export async function POST(request: NextRequest) {
    try {
       const supabase = createServerSupabaseClient()
 
-      // Supabase 인증 확인
-      const {
-         data: { user },
-         error: authError,
-      } = await supabase.auth.getUser()
+      // JWT 토큰 인증 확인
+      const accessToken = request.cookies.get('access_token')?.value
+      let userId: string | null = null
 
-      if (authError || !user) {
+      if (accessToken) {
+         const verified = verifyJwt(accessToken, process.env.JWT_SECRET || 'dev-secret')
+         if (verified.valid && verified.payload?.sub) {
+            userId = String(verified.payload.sub)
+         }
+      }
+
+      // 호환을 위해 user_id 쿠키도 허용
+      if (!userId) {
+         userId = request.cookies.get('user_id')?.value || null
+      }
+
+      if (!userId) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
       // Admin 권한 확인
-      const { data: userData, error: userError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
+      const { data: userData, error: userError } = await supabase.from('users').select('is_admin, nickname').eq('id', userId).single()
 
       if (userError || !userData?.is_admin) {
          return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 })
       }
+
+      // JWT 클레임 설정 (RLS 정책을 위해)
+      await setJwtClaims(supabase, userId, userData.nickname, true)
 
       const { title, content, is_important } = await request.json()
 
@@ -57,7 +71,7 @@ export async function POST(request: NextRequest) {
             title,
             content,
             is_important: is_important || false,
-            created_by: user.id,
+            created_by: userId,
          })
          .select()
          .single()
@@ -81,22 +95,35 @@ export async function PUT(request: NextRequest) {
    try {
       const supabase = createServerSupabaseClient()
 
-      // Supabase 인증 확인
-      const {
-         data: { user },
-         error: authError,
-      } = await supabase.auth.getUser()
+      // JWT 토큰 인증 확인
+      const accessToken = request.cookies.get('access_token')?.value
+      let userId: string | null = null
 
-      if (authError || !user) {
+      if (accessToken) {
+         const verified = verifyJwt(accessToken, process.env.JWT_SECRET || 'dev-secret')
+         if (verified.valid && verified.payload?.sub) {
+            userId = String(verified.payload.sub)
+         }
+      }
+
+      // 호환을 위해 user_id 쿠키도 허용
+      if (!userId) {
+         userId = request.cookies.get('user_id')?.value || null
+      }
+
+      if (!userId) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
       // Admin 권한 확인
-      const { data: userData, error: userError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
+      const { data: userData, error: userError } = await supabase.from('users').select('is_admin, nickname').eq('id', userId).single()
 
       if (userError || !userData?.is_admin) {
          return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 })
       }
+
+      // JWT 클레임 설정 (RLS 정책을 위해)
+      await setJwtClaims(supabase, userId, userData.nickname, true)
 
       const { id, title, content, is_important } = await request.json()
 
@@ -135,22 +162,35 @@ export async function DELETE(request: NextRequest) {
    try {
       const supabase = createServerSupabaseClient()
 
-      // Supabase 인증 확인
-      const {
-         data: { user },
-         error: authError,
-      } = await supabase.auth.getUser()
+      // JWT 토큰 인증 확인
+      const accessToken = request.cookies.get('access_token')?.value
+      let userId: string | null = null
 
-      if (authError || !user) {
+      if (accessToken) {
+         const verified = verifyJwt(accessToken, process.env.JWT_SECRET || 'dev-secret')
+         if (verified.valid && verified.payload?.sub) {
+            userId = String(verified.payload.sub)
+         }
+      }
+
+      // 호환을 위해 user_id 쿠키도 허용
+      if (!userId) {
+         userId = request.cookies.get('user_id')?.value || null
+      }
+
+      if (!userId) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
       // Admin 권한 확인
-      const { data: userData, error: userError } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
+      const { data: userData, error: userError } = await supabase.from('users').select('is_admin, nickname').eq('id', userId).single()
 
       if (userError || !userData?.is_admin) {
          return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 })
       }
+
+      // JWT 클레임 설정 (RLS 정책을 위해)
+      await setJwtClaims(supabase, userId, userData.nickname, true)
 
       const { searchParams } = new URL(request.url)
       const id = searchParams.get('id')

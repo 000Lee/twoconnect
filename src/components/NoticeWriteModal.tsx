@@ -22,7 +22,7 @@ export default function NoticeWriteModal({ isOpen, onClose, onSuccess }: NoticeW
       setMessage('')
 
       if (!title.trim() || !content.trim()) {
-         setMessage('❌ 제목과 내용을 모두 입력해주세요.')
+         setMessage('제목과 내용을 모두 입력해주세요.')
          setLoading(false)
          return
       }
@@ -42,7 +42,7 @@ export default function NoticeWriteModal({ isOpen, onClose, onSuccess }: NoticeW
          const result = await response.json()
 
          if (result.success) {
-            setMessage('✅ 공지사항이 성공적으로 작성되었습니다.')
+            setMessage(' 공지사항이 성공적으로 작성되었습니다.')
             setTitle('')
             setContent('')
             setIsImportant(false)
@@ -51,10 +51,10 @@ export default function NoticeWriteModal({ isOpen, onClose, onSuccess }: NoticeW
                onClose()
             }, 1000) // 1.5초에서 1초로 단축
          } else {
-            setMessage(`❌ ${result.error}`)
+            setMessage(`${result.error}`)
          }
       } catch (error) {
-         setMessage('❌ 서버 오류가 발생했습니다.')
+         setMessage(' 서버 오류가 발생했습니다.')
       } finally {
          setLoading(false)
       }

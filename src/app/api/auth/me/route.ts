@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { verifyJwt } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
    try {
-      // 쿠키에서 user_id 가져오기
-      const userId = request.cookies.get('user_id')?.value
+      // 1) access_token(JWT) 우선 검증
+      const accessToken = request.cookies.get('access_token')?.value
+      let userId: string | null = null
+
+      if (accessToken) {
+         const verified = verifyJwt(accessToken, process.env.JWT_SECRET || 'dev-secret')
+         if (verified.valid && verified.payload?.sub) {
+            userId = String(verified.payload.sub)
+         }
+      }
+
+      // 2) 호환을 위해 user_id 쿠키도 허용
+      if (!userId) {
+         userId = request.cookies.get('user_id')?.value || null
+      }
 
       if (!userId) {
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })

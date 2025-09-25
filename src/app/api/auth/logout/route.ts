@@ -8,8 +8,18 @@ export async function POST(request: NextRequest) {
       response.cookies.set('user_id', '', {
          httpOnly: true,
          secure: process.env.NODE_ENV === 'production',
-         sameSite: 'strict',
+         sameSite: 'lax',
          maxAge: 0, // 즉시 만료
+         path: '/',
+      })
+
+      // access_token도 제거
+      response.cookies.set('access_token', '', {
+         httpOnly: true,
+         secure: process.env.NODE_ENV === 'production',
+         sameSite: 'lax',
+         maxAge: 0,
+         path: '/',
       })
 
       return response

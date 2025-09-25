@@ -80,11 +80,11 @@ export default function AppHeader() {
                               <DropdownItem onClick={() => handleMenuClick('책갈피')}>책갈피</DropdownItem>
                               <DropdownItem onClick={() => handleMenuClick('내가쓴글')}>내가쓴글</DropdownItem>
                               <DropdownItem onClick={() => handleMenuClick('공지사항')} style={{ color: '#3b82f6', fontWeight: '500' }}>
-                                 📢 공지사항
+                                 공지사항
                               </DropdownItem>
                               {isAdmin && (
                                  <DropdownItem onClick={() => handleMenuClick('Admin관리')} style={{ color: '#dc2626', fontWeight: '500' }}>
-                                    ⚙️ Admin관리
+                                    Admin관리
                                  </DropdownItem>
                               )}
                               <DropdownDivider />
