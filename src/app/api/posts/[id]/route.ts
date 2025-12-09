@@ -3,10 +3,11 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const postId = parseInt(params.id)
+    const { id } = await params
+    const postId = parseInt(id)
     const { content, imageFile } = await request.json()
 
     // 입력 검증
@@ -87,10 +88,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const postId = parseInt(params.id)
+    const { id } = await params
+    const postId = parseInt(id)
     const userId = request.headers.get('x-user-id') || 'anonymous'
 
     console.log('포스트 삭제 요청:', { postId, userId })

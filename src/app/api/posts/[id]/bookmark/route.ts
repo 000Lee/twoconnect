@@ -3,10 +3,11 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const postId = parseInt(params.id)
+    const { id } = await params
+    const postId = parseInt(id)
     
     // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
     const userNickname = request.headers.get('x-user-nickname') || 'anonymous'
@@ -81,10 +82,11 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const postId = parseInt(params.id)
+    const { id } = await params
+    const postId = parseInt(id)
     const userNickname = request.headers.get('x-user-nickname') || 'anonymous'
 
     const supabase = createServerSupabaseClient()

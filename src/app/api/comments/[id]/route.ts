@@ -3,10 +3,11 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    const { id } = await params
+    const commentId = id
     const { content } = await request.json()
     const userNickname = request.headers.get('x-user-nickname')
 
@@ -75,10 +76,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    const { id } = await params
+    const commentId = id
     const userNickname = request.headers.get('x-user-nickname')
 
     if (!userNickname) {
