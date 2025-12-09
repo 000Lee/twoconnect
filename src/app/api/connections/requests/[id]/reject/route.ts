@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
    try {
-      const requestId = params.id
+      const { id } = await params
+      const requestId = parseInt(id, 10)
+      
+      if (isNaN(requestId)) {
+         return NextResponse.json({ success: false, error: '유효하지 않은 요청 ID입니다.' }, { status: 400 })
+      }
+
       const supabase = createServerSupabaseClient()
 
       // 쿠키에서 user_id 가져오기
@@ -13,15 +19,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
          return NextResponse.json({ success: false, error: '인증되지 않은 사용자입니다.' }, { status: 401 })
       }
 
-      // 현재 사용자의 닉네임 조회
-      const { data: userData, error: userError } = await supabase.from('users').select('nickname').eq('id', userId).single()
-
-      if (userError || !userData) {
-         return NextResponse.json({ success: false, error: '사용자 정보를 찾을 수 없습니다.' }, { status: 404 })
-      }
-
       // 친구요청이 존재하고 해당 사용자에게 온 것인지 확인 (user_id2는 수신자 UUID 문자열)
-      const { data: connectionData, error: fetchError } = await supabase.from('connections').select('*').eq('id', requestId).eq('user_id2', userId).eq('status', 'pending').single()
+      const { data: connectionData, error: fetchError } = await supabase
+         .from('connections')
+         .select('*')
+         .eq('id', requestId)
+         .eq('user_id2', userId)
+         .eq('status', 'pending')
+         .single()
 
       if (fetchError || !connectionData) {
          return NextResponse.json({ success: false, error: '유효하지 않은 친구요청입니다.' }, { status: 400 })
