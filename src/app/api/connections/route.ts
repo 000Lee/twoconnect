@@ -27,10 +27,27 @@ export async function POST(request: NextRequest) {
 
       console.log('친구 연결 요청:', { userId: userData.id, friendNickname })
 
+      // 친구 닉네임으로 사용자 ID 조회
+      const { data: friendData, error: friendError } = await supabase
+         .from('users')
+         .select('id, nickname')
+         .eq('nickname', friendNickname.trim())
+         .single()
+
+      if (friendError || !friendData) {
+         console.error('친구 사용자 조회 오류:', friendError)
+         return NextResponse.json({ success: false, error: '해당 닉네임의 사용자를 찾을 수 없습니다.' }, { status: 404 })
+      }
+
+      // 자기 자신에게 친구 요청을 보낼 수 없도록 체크
+      if (friendData.id === userData.id) {
+         return NextResponse.json({ success: false, error: '자기 자신에게는 친구 요청을 보낼 수 없습니다.' }, { status: 400 })
+      }
+
       // 친구 연결 요청 함수 호출
       const { data, error } = await supabase.rpc('request_connection', {
          p_user_id1: userData.id,
-         p_user_id2: friendNickname,
+         p_user_id2: friendData.id,
       })
 
       if (error) {
