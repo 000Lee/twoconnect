@@ -8,9 +8,11 @@ export async function DELETE(
   try {
     const { id } = await params
     const connectionId = id
-    const userNickname = request.headers.get('x-user-nickname')
 
-    if (!userNickname) {
+    // 쿠키에서 user_id (UUID) 가져오기
+    const userId = request.cookies.get('user_id')?.value
+
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: '로그인이 필요합니다.' },
         { status: 401 }
@@ -33,8 +35,8 @@ export async function DELETE(
       )
     }
 
-    // 본인이 포함된 연결만 삭제 가능
-    if (connection.user_id1 !== userNickname && connection.user_id2 !== userNickname) {
+    // 본인이 포함된 연결만 삭제 가능 (UUID로 비교)
+    if (connection.user_id1 !== userId && connection.user_id2 !== userId) {
       return NextResponse.json(
         { success: false, error: '연결을 삭제할 권한이 없습니다.' },
         { status: 403 }

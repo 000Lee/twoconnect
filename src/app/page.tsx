@@ -83,7 +83,7 @@ export default function Home() {
                   id: post.id,
                   title: post.nickname,
                   content: post.content,
-                  imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+                  imageUrl: post.image_url || '',
                   date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
                   time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
                   isChecked: post.is_read || false,
@@ -273,7 +273,7 @@ export default function Home() {
                      id: post.id,
                      title: post.nickname,
                      content: post.content,
-                     imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+                     imageUrl: post.image_url || '',
                      date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
                      time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
                      isChecked,
@@ -309,7 +309,7 @@ export default function Home() {
                   id: post.id,
                   title: post.nickname,
                   content: post.content,
-                  imageUrl: post.image_url || 'https://picsum.photos/seed/default/800/480',
+                  imageUrl: post.image_url || '',
                   date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
                   time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
                   isChecked: post.is_read || false,
@@ -382,12 +382,14 @@ export default function Home() {
 
          if (result.success) {
             console.log('포스트 생성 성공!')
-            // 성공 시 포스트 목록 새로고침
+            // 성공 시 글을 작성한 피드로 이동 및 새로고침
             if (postData.selectedFriendId) {
-               // 친구와의 피드에 작성한 경우 해당 피드 새로고침
-               fetchFriendPosts(postData.selectedFriendId)
+               // 친구와의 피드에 작성한 경우 해당 피드로 이동
+               setSelectedFriend(postData.selectedFriendId)
+               fetchMyPostsWithFriend(postData.selectedFriendId)
             } else {
-               // 본인 피드에 작성한 경우 본인 피드 새로고침
+               // 본인 피드에 작성한 경우 본인 피드로 이동
+               setSelectedFriend(null)
                fetchPosts()
             }
          } else {
@@ -512,6 +514,18 @@ export default function Home() {
             if (selectedFriend) {
                setFriendPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked: newCheckedState } : post)))
             }
+
+            // 다른 모달에 체크 상태 변경 이벤트 전송
+            if (typeof window !== 'undefined') {
+               window.dispatchEvent(
+                  new CustomEvent('post:checked', {
+                     detail: {
+                        postId: postId,
+                        isChecked: newCheckedState,
+                     },
+                  })
+               )
+            }
          } else {
             console.error('포스트 체크/해제 실패:', result.error)
             alert('게시글 체크/해제에 실패했습니다: ' + result.error)
@@ -547,6 +561,18 @@ export default function Home() {
             // 선택된 친구의 게시글도 업데이트
             if (selectedFriend) {
                setFriendPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked: newBookmarkedState } : post)))
+            }
+
+            // 다른 모달에 책갈피 상태 변경 이벤트 전송
+            if (typeof window !== 'undefined') {
+               window.dispatchEvent(
+                  new CustomEvent('post:bookmarked', {
+                     detail: {
+                        postId: postId,
+                        isBookmarked: newBookmarkedState,
+                     },
+                  })
+               )
             }
          } else {
             console.error('포스트 책갈피/해제 실패:', result.error)
@@ -585,8 +611,12 @@ export default function Home() {
 
          if (result.success) {
             console.log('포스트 삭제 성공!')
-            // 성공 시 포스트 목록 새로고침
-            fetchPosts()
+            // 성공 시 포스트 목록 새로고침 (현재 보고 있는 피드에 맞게)
+            if (selectedFriend) {
+               fetchMyPostsWithFriend(selectedFriend)
+            } else {
+               fetchPosts()
+            }
          } else {
             console.error('포스트 삭제 실패:', result.error)
             alert('포스트 삭제에 실패했습니다: ' + result.error)
@@ -731,14 +761,18 @@ export default function Home() {
                                  <span>{post.date}</span>
                                  <span>{post.time}</span>
                               </CardHeader>
-                              <CardImage
-                                 style={{
-                                    backgroundImage: `url('${post.imageUrl}')`,
-                                    backgroundSize: 'cover',
-                                    backgroundPosition: 'center',
-                                    backgroundRepeat: 'no-repeat',
-                                 }}
-                              />
+                              {post.imageUrl ? (
+                                 <CardImage
+                                    style={{
+                                       backgroundImage: `url('${post.imageUrl}')`,
+                                       backgroundSize: 'cover',
+                                       backgroundPosition: 'center',
+                                       backgroundRepeat: 'no-repeat',
+                                    }}
+                                 />
+                              ) : (
+                                 <CardDivider />
+                              )}
                               <CardBody>{post.content}</CardBody>
                               <CardActions>
                                  <a
@@ -901,13 +935,12 @@ const List = styled.div`
    display: grid;
    gap: 24px;
    grid-template-columns: 1fr;
-   @media (min-width: 900px) {
-      grid-template-columns: 1fr;
-   }
 `
 
 const Card = styled.article`
-   width: clamp(280px, 60vw, 560px);
+   width: 100%;
+   max-width: 560px;
+   min-width: 280px;
    display: grid;
    grid-template-rows: auto auto 1fr auto;
    border: 1px solid #e5e7eb;
@@ -929,6 +962,12 @@ const CardImage = styled.div`
    aspect-ratio: 5/3;
    background-size: cover;
    background-position: 50% 50%;
+`
+const CardDivider = styled.div`
+   margin: 12px 0;
+   width: 100%;
+   height: 1px;
+   background-color: #e5e7eb;
 `
 const CardBody = styled.div`
    font-size: 13px;

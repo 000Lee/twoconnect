@@ -96,12 +96,8 @@ export async function GET(request: NextRequest) {
       let error
 
       if (friendId) {
-         // 두 사용자 닉네임/UUID 모두 확보
-         let friendNickname = friendId
-         let userUuid: string | null = null
-         let friendUuid: string | null = null
-
          // 현재 사용자 UUID 조회
+         let userUuid: string | null = null
          if (userNickname) {
             const { data: me, error: meErr } = await supabase.from('users').select('id').eq('nickname', userNickname).single()
             if (meErr || !me) {
@@ -110,32 +106,21 @@ export async function GET(request: NextRequest) {
             userUuid = me.id
          }
 
-         // friendId가 UUID면 닉네임으로 변환, 아니면 닉네임으로 주어진 경우 UUID로 변환
-         if (friendId.length > 20) {
-            const { data: f, error: fErr } = await supabase.from('users').select('id, nickname').eq('id', friendId).single()
-            if (fErr || !f) {
-               return NextResponse.json({ success: false, error: '친구 정보를 찾을 수 없습니다.' }, { status: 404 })
-            }
-            friendUuid = f.id
-            friendNickname = f.nickname
-         } else {
-            const { data: f, error: fErr } = await supabase.from('users').select('id').eq('nickname', friendId).single()
-            if (fErr || !f) {
-               return NextResponse.json({ success: false, error: '친구 정보를 찾을 수 없습니다.' }, { status: 404 })
-            }
-            friendUuid = f.id
-         }
+         // friendId는 UUID로 전달됨
+         const friendUuid = friendId
 
-         // 1:1 피드 조건으로 직접 조회
-         const orFilter = `and(nickname.eq.${userNickname},friend_id.eq.${friendUuid}),and(nickname.eq.${friendNickname},friend_id.eq.${userUuid})`
-         const { data, error: qErr } = await supabase.from('posts').select('*').or(orFilter).order('created_at', { ascending: false })
+         // RPC 함수로 1:1 피드 조회
+         const { data, error: qErr } = await supabase.rpc('get_connected_posts', {
+            p_user_uuid: userUuid,
+            p_friend_uuid: friendUuid,
+         })
 
          posts = data as any
          error = qErr as any
       } else if (userId) {
-         // 본인의 게시글만 가져오기
+         // 본인의 게시글만 가져오기 (userId는 실제로 닉네임)
          const { data, error: userError } = await supabase.rpc('get_user_posts', {
-            p_user_id: userId,
+            p_nickname: userId,
          })
          posts = data
          error = userError

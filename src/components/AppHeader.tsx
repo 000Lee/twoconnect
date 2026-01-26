@@ -113,7 +113,7 @@ export default function AppHeader() {
          <MyPostsModal isOpen={isMyPostsModalOpen} onClose={() => setIsMyPostsModalOpen(false)} />
 
          {/* 친구관리 모달 */}
-         <FriendManagementModal isOpen={isFriendManagementModalOpen} onClose={() => setIsFriendManagementModalOpen(false)} />
+         <FriendManagementModal isOpen={isFriendManagementModalOpen} onClose={() => setIsFriendManagementModalOpen(false)} userNickname={user?.nickname || ''} />
 
          {/* 체크 모달 */}
          <PostCheckModal isOpen={isPostCheckModalOpen} onClose={() => setIsPostCheckModalOpen(false)} />

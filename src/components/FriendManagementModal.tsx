@@ -4,32 +4,24 @@ import React, { useState, useEffect } from 'react'
 import styled from 'styled-components'
 
 interface ConnectionItem {
-  id: string
-  user1_nickname: string
-  user2_nickname: string
+  id: number
+  friend_nickname: string
   created_at: string
 }
 
 interface FriendManagementModalProps {
   isOpen: boolean
   onClose: () => void
+  userNickname: string
 }
 
-export default function FriendManagementModal({ isOpen, onClose }: FriendManagementModalProps) {
+export default function FriendManagementModal({ isOpen, onClose, userNickname }: FriendManagementModalProps) {
   const [connections, setConnections] = useState<ConnectionItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [userNickname, setUserNickname] = useState<string>('')
-
-  useEffect(() => {
-    if (!isOpen) return
-    const nickname = localStorage.getItem('user_nickname')
-    if (nickname) {
-      setUserNickname(nickname)
-    }
-  }, [isOpen])
 
   useEffect(() => {
     if (userNickname && isOpen) {
+      console.log('[친구관리모달] fetchConnections 호출!', userNickname)
       fetchConnections()
     }
   }, [userNickname, isOpen])
@@ -40,27 +32,21 @@ export default function FriendManagementModal({ isOpen, onClose }: FriendManagem
       const response = await fetch(`/api/connections?userId=${userNickname}`)
       const result = await response.json()
       
-      console.log('API 응답:', result)
-      console.log('userNickname:', userNickname)
-      
-      if (result.success) {
-        console.log('연결된 친구들:', result.connections)
-        
-        // API 응답 데이터 구조 확인 및 변환
-        const formattedConnections = result.connections.map((connection: any) => {
-          console.log('개별 연결 데이터:', connection)
-          return {
-            id: connection.id || connection.connection_id || String(Math.random()),
-            user1_nickname: connection.user1_nickname || connection.friend_nickname || '',
-            user2_nickname: connection.user2_nickname || connection.friend_nickname || '',
-            created_at: connection.created_at || new Date().toISOString()
-          }
-        })
-        
-        console.log('변환된 연결 데이터:', formattedConnections)
+      console.log('[친구관리모달] API 응답:', result)
+
+      if (result.success && result.connections) {
+        console.log('[친구관리모달] 연결된 친구들:', result.connections)
+
+        const formattedConnections = result.connections.map((connection: any) => ({
+          id: connection.connection_id,
+          friend_nickname: connection.friend_nickname,
+          created_at: connection.created_at
+        }))
+
+        console.log('[친구관리모달] 변환 완료:', formattedConnections)
         setConnections(formattedConnections)
       } else {
-        console.error('API 응답 실패:', result.error)
+        console.error('[친구관리모달] API 응답 실패:', result.error)
       }
     } catch (error) {
       console.error('친구 목록 조회 오류:', error)
@@ -69,7 +55,7 @@ export default function FriendManagementModal({ isOpen, onClose }: FriendManagem
     }
   }
 
-  const handleDeleteConnection = async (connectionId: string) => {
+  const handleDeleteConnection = async (connectionId: number) => {
     if (!confirm('친구 연결을 끊으시겠습니까?')) return
 
     try {
@@ -95,9 +81,7 @@ export default function FriendManagementModal({ isOpen, onClose }: FriendManagem
   }
 
   const getFriendNickname = (connection: ConnectionItem) => {
-    return connection.user1_nickname === userNickname 
-      ? connection.user2_nickname 
-      : connection.user1_nickname
+    return connection.friend_nickname
   }
 
   if (!isOpen) return null

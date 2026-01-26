@@ -92,6 +92,33 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
          .finally(() => setLoading(false))
    }, [isOpen])
 
+   // 다른 모달에서 발생한 체크/책갈피 이벤트 수신
+   useEffect(() => {
+      const handlePostChecked = (event: CustomEvent) => {
+         const { postId, isChecked } = event.detail
+         setBookmarkedPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked } : post)))
+      }
+
+      const handlePostBookmarked = (event: CustomEvent) => {
+         const { postId, isBookmarked } = event.detail
+         setBookmarkedPosts((prevPosts) => {
+            // 책갈피 해제된 경우 목록에서 제거
+            if (!isBookmarked) {
+               return prevPosts.filter((post) => post.id !== postId)
+            }
+            return prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked } : post))
+         })
+      }
+
+      window.addEventListener('post:checked', handlePostChecked as EventListener)
+      window.addEventListener('post:bookmarked', handlePostBookmarked as EventListener)
+
+      return () => {
+         window.removeEventListener('post:checked', handlePostChecked as EventListener)
+         window.removeEventListener('post:bookmarked', handlePostBookmarked as EventListener)
+      }
+   }, [])
+
    const handleSelectAuthor = async (authorNickname: string) => {
       setSelectedAuthor(authorNickname)
       setPostsLoading(true)

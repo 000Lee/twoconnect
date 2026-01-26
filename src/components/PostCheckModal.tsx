@@ -51,6 +51,33 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
          .finally(() => setLoading(false))
    }, [isOpen, user])
 
+   // 다른 모달에서 발생한 체크/책갈피 이벤트 수신
+   useEffect(() => {
+      const handlePostChecked = (event: CustomEvent) => {
+         const { postId, isChecked } = event.detail
+         setUnreadPosts((prevPosts) => {
+            // 체크된 경우 목록에서 제거 (읽지 않은 게시물 목록이므로)
+            if (isChecked) {
+               return prevPosts.filter((post) => post.id !== postId)
+            }
+            return prevPosts.map((post) => (post.id === postId ? { ...post, isChecked } : post))
+         })
+      }
+
+      const handlePostBookmarked = (event: CustomEvent) => {
+         const { postId, isBookmarked } = event.detail
+         setUnreadPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked } : post)))
+      }
+
+      window.addEventListener('post:checked', handlePostChecked as EventListener)
+      window.addEventListener('post:bookmarked', handlePostBookmarked as EventListener)
+
+      return () => {
+         window.removeEventListener('post:checked', handlePostChecked as EventListener)
+         window.removeEventListener('post:bookmarked', handlePostBookmarked as EventListener)
+      }
+   }, [])
+
    const handleSelectFriend = async (friendId: string) => {
       setSelectedFriend(friendId)
       setPostsLoading(true)

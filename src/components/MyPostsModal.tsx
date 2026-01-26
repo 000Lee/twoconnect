@@ -42,6 +42,27 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          .finally(() => setLoading(false))
    }, [isOpen, user])
 
+   // 다른 모달에서 발생한 체크/책갈피 이벤트 수신
+   useEffect(() => {
+      const handlePostChecked = (event: CustomEvent) => {
+         const { postId, isChecked } = event.detail
+         setMyPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked } : post)))
+      }
+
+      const handlePostBookmarked = (event: CustomEvent) => {
+         const { postId, isBookmarked } = event.detail
+         setMyPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked } : post)))
+      }
+
+      window.addEventListener('post:checked', handlePostChecked as EventListener)
+      window.addEventListener('post:bookmarked', handlePostBookmarked as EventListener)
+
+      return () => {
+         window.removeEventListener('post:checked', handlePostChecked as EventListener)
+         window.removeEventListener('post:bookmarked', handlePostBookmarked as EventListener)
+      }
+   }, [])
+
    const handleSelectFriend = async (friendId: string) => {
       setSelectedFriend(friendId)
       setPostsLoading(true)
@@ -55,7 +76,54 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          if (result.success) {
             // 내가 쓴 글만 필터링
             const onlyMine = result.posts.filter((post: any) => post.nickname === user.nickname)
-            setMyPosts(onlyMine)
+
+            // 각 게시물의 체크/책갈피 상태 조회
+            const postsWithStatus = await Promise.all(
+               onlyMine.map(async (post: any) => {
+                  let isChecked = false
+                  let isBookmarked = false
+
+                  // 체크 상태 조회
+                  try {
+                     const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
+                        credentials: 'include',
+                        headers: {
+                           'x-user-nickname': user.nickname,
+                        },
+                     })
+                     const checkResult = await checkResponse.json()
+                     if (checkResult.success) {
+                        isChecked = checkResult.isChecked
+                     }
+                  } catch (error) {
+                     console.error('체크 상태 조회 오류:', error)
+                  }
+
+                  // 책갈피 상태 조회
+                  try {
+                     const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
+                        credentials: 'include',
+                        headers: {
+                           'x-user-nickname': user.nickname,
+                        },
+                     })
+                     const bookmarkResult = await bookmarkResponse.json()
+                     if (bookmarkResult.success) {
+                        isBookmarked = bookmarkResult.isBookmarked
+                     }
+                  } catch (error) {
+                     console.error('책갈피 상태 조회 오류:', error)
+                  }
+
+                  return {
+                     ...post,
+                     isChecked,
+                     isBookmarked,
+                  }
+               })
+            )
+
+            setMyPosts(postsWithStatus)
          }
       } catch (error) {
          console.error('내가쓴글 조회 오류:', error)
@@ -90,6 +158,18 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             // 체크 상태에 따라 게시글 상태 업데이트
             const newCheckedState = result.action === 'checked'
             setMyPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked: newCheckedState } : post)))
+
+            // 다른 모달에 체크 상태 변경 이벤트 전송
+            if (typeof window !== 'undefined') {
+               window.dispatchEvent(
+                  new CustomEvent('post:checked', {
+                     detail: {
+                        postId: postId,
+                        isChecked: newCheckedState,
+                     },
+                  })
+               )
+            }
          } else {
             console.error('포스트 체크/해제 실패:', result.error)
             alert('게시글 체크/해제에 실패했습니다: ' + result.error)
@@ -121,6 +201,18 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             // 책갈피 상태에 따라 게시글 상태 업데이트
             const newBookmarkedState = result.action === 'bookmarked'
             setMyPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked: newBookmarkedState } : post)))
+
+            // 다른 모달에 책갈피 상태 변경 이벤트 전송
+            if (typeof window !== 'undefined') {
+               window.dispatchEvent(
+                  new CustomEvent('post:bookmarked', {
+                     detail: {
+                        postId: postId,
+                        isBookmarked: newBookmarkedState,
+                     },
+                  })
+               )
+            }
          } else {
             console.error('포스트 책갈피/해제 실패:', result.error)
             alert('게시글 책갈피/해제에 실패했습니다: ' + result.error)
@@ -192,7 +284,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                         const updatedPostData = fetchResult.posts.find((post: any) => post.id === updatedPost.id)
                         if (updatedPostData) {
                            // 실제 데이터베이스에서 가져온 최신 데이터로 업데이트
-                           const actualImageUrl = updatedPostData.image_url || 'https://picsum.photos/seed/default/800/480'
+                           const actualImageUrl = updatedPostData.image_url || ''
 
                            // 게시물 목록에서 수정된 게시물 업데이트
                            setMyPosts((prev) =>
