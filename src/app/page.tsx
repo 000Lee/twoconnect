@@ -455,8 +455,12 @@ export default function Home() {
 
          if (result.success) {
             console.log('포스트 수정 성공!')
-            // 성공 시 포스트 목록 새로고침
-            fetchPosts()
+            // 성공 시 포스트 목록 새로고침 (현재 선택된 친구 유지)
+            if (selectedFriend) {
+               fetchMyPostsWithFriend(selectedFriend)
+            } else {
+               fetchPosts()
+            }
          } else {
             console.error('포스트 수정 실패:', result.error)
          }
