@@ -9,7 +9,8 @@ export async function PUT(
     const { id } = await params
     const commentId = id
     const { content } = await request.json()
-    const userNickname = request.headers.get('x-user-nickname')
+    const rawNickname = request.headers.get('x-user-nickname')
+    const userNickname = rawNickname ? decodeURIComponent(rawNickname) : null
 
     if (!userNickname) {
       return NextResponse.json(
@@ -81,7 +82,8 @@ export async function DELETE(
   try {
     const { id } = await params
     const commentId = id
-    const userNickname = request.headers.get('x-user-nickname')
+    const rawNickname = request.headers.get('x-user-nickname')
+    const userNickname = rawNickname ? decodeURIComponent(rawNickname) : null
 
     if (!userNickname) {
       return NextResponse.json(

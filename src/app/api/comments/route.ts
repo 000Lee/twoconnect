@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
     console.log('받은 요청 본문:', body)
     
     const { postId, content } = body
-    const userNickname = request.headers.get('x-user-nickname')
+    const rawNickname = request.headers.get('x-user-nickname')
+    const userNickname = rawNickname ? decodeURIComponent(rawNickname) : null
     console.log('헤더에서 가져온 닉네임:', userNickname)
 
     // 입력 검증

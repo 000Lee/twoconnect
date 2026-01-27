@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
       }
 
       // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
-      const userNickname = request.headers.get('x-user-nickname') || '익명'
+      const rawNickname = request.headers.get('x-user-nickname') || '익명'
+      const userNickname = decodeURIComponent(rawNickname)
       const userId = request.headers.get('x-user-id') || 'anonymous'
 
       // Supabase 클라이언트 생성

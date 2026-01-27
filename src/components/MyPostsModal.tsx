@@ -88,7 +88,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
                         credentials: 'include',
                         headers: {
-                           'x-user-nickname': user.nickname,
+                           'x-user-nickname': encodeURIComponent(user.nickname),
                         },
                      })
                      const checkResult = await checkResponse.json()
@@ -104,7 +104,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
                         credentials: 'include',
                         headers: {
-                           'x-user-nickname': user.nickname,
+                           'x-user-nickname': encodeURIComponent(user.nickname),
                         },
                      })
                      const bookmarkResult = await bookmarkResponse.json()

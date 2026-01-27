@@ -242,7 +242,7 @@ export default function Home() {
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
                         headers: {
-                           'x-user-nickname': user?.nickname || '',
+                           'x-user-nickname': encodeURIComponent(user?.nickname || ''),
                         },
                      })
                      const checkResult = await checkResponse.json()
@@ -258,7 +258,7 @@ export default function Home() {
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
                         headers: {
-                           'x-user-nickname': user?.nickname || '',
+                           'x-user-nickname': encodeURIComponent(user?.nickname || ''),
                         },
                      })
                      const bookmarkResult = await bookmarkResponse.json()
@@ -371,7 +371,7 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': user?.nickname || '',
+               'x-user-nickname': encodeURIComponent(user?.nickname || ''),
                'x-user-id': user?.id || '',
             },
             body: JSON.stringify(requestBody),
@@ -497,7 +497,7 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': user?.nickname || '',
+               'x-user-nickname': encodeURIComponent(user?.nickname || ''),
             },
          })
 
@@ -545,7 +545,7 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': user?.nickname || '',
+               'x-user-nickname': encodeURIComponent(user?.nickname || ''),
             },
          })
 

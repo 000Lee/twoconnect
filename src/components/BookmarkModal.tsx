@@ -161,7 +161,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
                         headers: {
-                           'x-user-nickname': user.nickname,
+                           'x-user-nickname': encodeURIComponent(user.nickname),
                         },
                      })
                      const checkResult = await checkResponse.json()
@@ -177,7 +177,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
                         headers: {
-                           'x-user-nickname': user.nickname,
+                           'x-user-nickname': encodeURIComponent(user.nickname),
                         },
                      })
                      const bookmarkResult = await bookmarkResponse.json()
@@ -221,7 +221,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': user.nickname,
+               'x-user-nickname': encodeURIComponent(user.nickname),
             },
          })
 
@@ -266,7 +266,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': user.nickname,
+               'x-user-nickname': encodeURIComponent(user.nickname),
             },
          })
 
@@ -377,7 +377,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                               try {
                                  const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                                    headers: { 'x-user-nickname': user.nickname },
+                                    headers: { 'x-user-nickname': encodeURIComponent(user.nickname) },
                                  })
                                  const checkResult = await checkResponse.json()
                                  if (checkResult.success) isChecked = checkResult.isChecked
@@ -387,7 +387,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                               try {
                                  const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                                    headers: { 'x-user-nickname': user.nickname },
+                                    headers: { 'x-user-nickname': encodeURIComponent(user.nickname) },
                                  })
                                  const bookmarkResult = await bookmarkResponse.json()
                                  if (bookmarkResult.success) isBookmarked = bookmarkResult.isBookmarked

@@ -10,7 +10,8 @@ export async function POST(
     const postId = parseInt(id)
     
     // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
-    const userNickname = request.headers.get('x-user-nickname') || 'anonymous'
+    const rawNickname = request.headers.get('x-user-nickname') || 'anonymous'
+    const userNickname = decodeURIComponent(rawNickname)
 
     // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient()
@@ -87,7 +88,8 @@ export async function GET(
   try {
     const { id } = await params
     const postId = parseInt(id)
-    const userNickname = request.headers.get('x-user-nickname') || 'anonymous'
+    const rawNickname = request.headers.get('x-user-nickname') || 'anonymous'
+    const userNickname = decodeURIComponent(rawNickname)
 
     const supabase = createServerSupabaseClient()
     await supabase.rpc('set_user_nickname', { p_nickname: userNickname })

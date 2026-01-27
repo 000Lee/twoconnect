@@ -77,7 +77,7 @@ export default function CommentModal({ isOpen, onClose, postId, postContent }: C
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': encodeURIComponent(userNickname),
             },
             body: JSON.stringify(requestBody),
          })
@@ -110,7 +110,7 @@ export default function CommentModal({ isOpen, onClose, postId, postContent }: C
             method: 'DELETE',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': encodeURIComponent(userNickname),
             },
          })
 
@@ -144,7 +144,7 @@ export default function CommentModal({ isOpen, onClose, postId, postContent }: C
             method: 'PUT',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': userNickname,
+               'x-user-nickname': encodeURIComponent(userNickname),
             },
             body: JSON.stringify({
                content: editContent.trim(),
