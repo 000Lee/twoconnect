@@ -70,6 +70,12 @@ export default function FriendManagementModal({ isOpen, onClose, userNickname }:
       const result = await response.json()
       if (result.success) {
         fetchConnections() // 친구 목록 새로고침
+
+        // 홈화면 친구 목록도 업데이트
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('connections:updated'))
+        }
+
         alert('친구 연결이 끊어졌습니다.')
       } else {
         alert('친구 연결 끊기에 실패했습니다: ' + result.error)

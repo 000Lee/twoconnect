@@ -128,8 +128,10 @@ export default function PostCheckModal({ isOpen, onClose }: PostCheckModalProps)
                   })
                )
 
-               // 체크되지 않은 게시물만 필터링 (읽지 않은 게시물)
-               const unreadPosts = unreadPostsWithCheckStatus.filter((post: any) => !post.isChecked)
+               // 체크되지 않은 게시물만 필터링 후 최신순 정렬 (읽지 않은 게시물)
+               const unreadPosts = unreadPostsWithCheckStatus
+                  .filter((post: any) => !post.isChecked)
+                  .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                setUnreadPosts(unreadPosts)
             } else {
                setUnreadPosts([])

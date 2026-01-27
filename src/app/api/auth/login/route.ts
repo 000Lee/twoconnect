@@ -28,15 +28,15 @@ export async function POST(request: NextRequest) {
       if (data && data.success) {
          const response = NextResponse.json(data)
 
-         // Access JWT (15m)
-         const accessToken = signJwt({ sub: data.user_id, nickname: data.nickname, email: data.email, is_admin: !!data.is_admin }, process.env.JWT_SECRET || 'dev-secret', { expiresInSec: 60 * 15 })
+         // Access JWT (1일)
+         const accessToken = signJwt({ sub: data.user_id, nickname: data.nickname, email: data.email, is_admin: !!data.is_admin }, process.env.JWT_SECRET || 'dev-secret', { expiresInSec: 60 * 60 * 24 })
 
          response.cookies.set('access_token', accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
-            maxAge: 60 * 15,
+            maxAge: 60 * 60 * 24,
          })
 
          // Keep user_id for backward compatibility during transition

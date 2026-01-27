@@ -61,16 +61,21 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                // 모든 친구들과의 피드에서 글 작성자 목록 추출
                const friendIds = result.connections?.map((conn: any) => conn.friend_id) || []
-               const allFriendIds = [user.nickname, ...friendIds] // 본인 + 친구들
 
-               // 각 친구와의 피드에서 게시글 조회하여 작성자 목록 생성
-               Promise.all(
-                  allFriendIds.map((friendId) =>
-                     fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
-                        .then((res) => res.json())
-                        .then((result) => (result.success ? result.posts : []))
-                  )
-               ).then((allPosts) => {
+               // 본인 피드 조회 (friendId 없이)
+               const myPostsPromise = fetch(`/api/posts`, { credentials: 'include' })
+                  .then((res) => res.json())
+                  .then((result) => (result.success ? result.posts : []))
+
+               // 친구들과의 피드 조회
+               const friendPostsPromises = friendIds.map((friendId: string) =>
+                  fetch(`/api/posts?friendId=${friendId}`, { credentials: 'include' })
+                     .then((res) => res.json())
+                     .then((result) => (result.success ? result.posts : []))
+               )
+
+               // 본인 피드 + 친구들 피드 모두 조회
+               Promise.all([myPostsPromise, ...friendPostsPromises]).then((allPosts) => {
                   // 모든 게시글을 하나의 배열로 합치기
                   const flatPosts = allPosts.flat()
 
@@ -90,6 +95,14 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             }
          })
          .finally(() => setLoading(false))
+   }, [isOpen, user])
+
+   // 모달이 닫힐 때 상태 초기화
+   useEffect(() => {
+      if (!isOpen) {
+         setSelectedAuthor(null)
+         setBookmarkedPosts([])
+      }
    }, [isOpen])
 
    // 다른 모달에서 발생한 체크/책갈피 이벤트 수신
@@ -100,13 +113,28 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
       }
 
       const handlePostBookmarked = (event: CustomEvent) => {
-         const { postId, isBookmarked } = event.detail
+         const { postId, isBookmarked, post } = event.detail
          setBookmarkedPosts((prevPosts) => {
             // 책갈피 해제된 경우 목록에서 제거
             if (!isBookmarked) {
-               return prevPosts.filter((post) => post.id !== postId)
+               return prevPosts.filter((p) => p.id !== postId)
             }
-            return prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked } : post))
+            // 이미 목록에 있는 경우 상태만 업데이트
+            const existingPost = prevPosts.find((p) => p.id === postId)
+            if (existingPost) {
+               return prevPosts.map((p) => (p.id === postId ? { ...p, isBookmarked } : p))
+            }
+            // 새 책갈피 추가: 선택된 작성자의 글이고 post 정보가 있으면 목록에 추가
+            if (post && selectedAuthor && post.nickname === selectedAuthor) {
+               const newPost = {
+                  ...post,
+                  isBookmarked: true,
+                  isChecked: false,
+               }
+               // 최신순 정렬 유지
+               return [...prevPosts, newPost].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            }
+            return prevPosts
          })
       }
 
@@ -128,16 +156,22 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
          // 모든 친구들과의 피드에서 해당 작성자가 올린 글만 가져오기
          const friendIds = connections.map((conn) => conn.friend_id)
-         const allFriendIds = [user.nickname, ...friendIds] // 본인 + 친구들
 
-         // 각 친구와의 피드에서 게시글 조회
-         const allPostsResponses = await Promise.all(
-            allFriendIds.map((friendId) =>
-               fetch(`/api/posts?userId=${user.nickname}&friendId=${friendId}`)
+         // 본인 피드 조회 (friendId 없이)
+         const myPostsResponse = await fetch(`/api/posts`, { credentials: 'include' })
+            .then((res) => res.json())
+            .then((result) => (result.success ? result.posts : []))
+
+         // 친구들과의 피드 조회
+         const friendPostsResponses = await Promise.all(
+            friendIds.map((friendId) =>
+               fetch(`/api/posts?friendId=${friendId}`, { credentials: 'include' })
                   .then((res) => res.json())
                   .then((result) => (result.success ? result.posts : []))
             )
          )
+
+         const allPostsResponses = [myPostsResponse, ...friendPostsResponses]
 
          // 모든 게시글을 하나의 배열로 합치고 해당 작성자의 글만 필터링
          const allPosts = allPostsResponses.flat()
@@ -192,8 +226,10 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                })
             )
 
-            // 책갈피된 게시물만 필터링
-            const bookmarkedPosts = bookmarkedPostsWithStatus.filter((post: any) => post.isBookmarked)
+            // 책갈피된 게시물만 필터링 후 최신순 정렬
+            const bookmarkedPosts = bookmarkedPostsWithStatus
+               .filter((post: any) => post.isBookmarked)
+               .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             setBookmarkedPosts(bookmarkedPosts)
          } else {
             setBookmarkedPosts([])

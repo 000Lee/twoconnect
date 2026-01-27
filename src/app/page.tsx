@@ -1,10 +1,12 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import styled from 'styled-components'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePosts } from '@/hooks/usePosts'
 import PostModal from '@/components/PostModal'
 import FriendAddModal from '../components/FriendAddModal'
 import CommentModal from '../components/CommentModal'
+import ImageViewerModal from '../components/ImageViewerModal'
 
 // 색상 순서 정의 (최대 11명까지)
 const CONNECTION_COLORS = ['#FFCDB8', '#FFE9C0', '#E5FFBC', '#D3FFEA', '#D3DFFF', '#E7DDFF', '#FFD9EE', '#EAD2A4', '#C3E38F', '#A6E8C8']
@@ -24,30 +26,6 @@ export default function Home() {
       content: string
       imageUrl: string
    } | null>(null)
-   const [posts, setPosts] = useState<
-      Array<{
-         id: number
-         title: string
-         content: string
-         imageUrl: string
-         date: string
-         time: string
-         isChecked?: boolean
-         isBookmarked?: boolean
-      }>
-   >([])
-   const [friendPosts, setFriendPosts] = useState<
-      Array<{
-         id: number
-         title: string
-         content: string
-         imageUrl: string
-         date: string
-         time: string
-         isChecked?: boolean
-         isBookmarked?: boolean
-      }>
-   >([])
    const [connections, setConnections] = useState<
       Array<{
          connection_id: number
@@ -58,53 +36,57 @@ export default function Home() {
       }>
    >([])
    const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
+   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
+   const [selectedImageUrl, setSelectedImageUrl] = useState<string>('')
+   const [displayCount, setDisplayCount] = useState(5) // 처음 5개만 표시
+   const [isLoadingMore, setIsLoadingMore] = useState(false) // 추가 로딩 중 상태
+   const loaderRef = useRef<HTMLDivElement>(null)
 
-   // fetchPosts 함수 정의
-   const fetchPosts = async () => {
-      try {
-         // user가 없으면 데이터를 가져오지 않음
-         if (!user) {
-            console.log('사용자가 로그인되지 않음, fetchPosts 건너뜀')
-            return
-         }
+   // SWR 훅으로 포스트 관리
+   const { posts, refreshPosts, updatePost, removePost } = usePosts(selectedFriend, user?.nickname || null)
 
-         // 본인의 게시글만 가져오기 (JWT 인증 사용)
-         const response = await fetch('/api/posts', {
-            credentials: 'include',
-         })
-         const result = await response.json()
+   // 표시할 포스트 (무한스크롤)
+   const displayedPosts = posts.slice(0, displayCount)
+   const hasMore = displayCount < posts.length
 
-         if (result.success) {
-            console.log('받아온 포스트 데이터:', result.posts)
+   // 친구 변경 시 displayCount 초기화
+   useEffect(() => {
+      setDisplayCount(5)
+   }, [selectedFriend])
 
-            // 데이터베이스 형식을 프론트엔드 형식으로 변환
-            const formattedPosts = result.posts.map((post: any) => {
-               console.log('포스트 이미지 URL:', post.image_url)
-
-               return {
-                  id: post.id,
-                  title: post.nickname,
-                  content: post.content,
-                  imageUrl: post.image_url || '',
-                  date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-                  time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-                  isChecked: post.is_read || false,
-                  isBookmarked: false, // 책갈피 기능은 아직 구현되지 않음
-               }
-            })
-
-            console.log('변환된 포스트:', formattedPosts)
-            setPosts(formattedPosts)
-         }
-      } catch (error) {
-         console.error('포스트 조회 오류:', error)
+   // 무한스크롤 - Intersection Observer
+   const loadMore = useCallback(() => {
+      if (hasMore && !isLoadingMore) {
+         setIsLoadingMore(true)
+         // 약간의 딜레이를 줘서 연속 로드 방지
+         setTimeout(() => {
+            setDisplayCount((prev) => prev + 5)
+            setIsLoadingMore(false)
+         }, 100)
       }
-   }
+   }, [hasMore, isLoadingMore])
+
+   useEffect(() => {
+      const currentLoader = loaderRef.current
+      if (!currentLoader) return
+
+      const observer = new IntersectionObserver(
+         (entries) => {
+            if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+               loadMore()
+            }
+         },
+         { threshold: 0.1, rootMargin: '100px' }
+      )
+
+      observer.observe(currentLoader)
+
+      return () => observer.disconnect()
+   }, [hasMore, loadMore, isLoadingMore])
 
    // 사용자 정보가 변경될 때마다 실행
    useEffect(() => {
       if (user) {
-         fetchPosts()
          fetchConnections(user.nickname)
       }
 
@@ -120,7 +102,6 @@ export default function Home() {
             const friendIdFromEvent = e?.detail?.friendId as string | undefined
             if (!friendIdFromEvent) return
             setSelectedFriend(friendIdFromEvent)
-            fetchMyPostsWithFriend(friendIdFromEvent)
          } catch {}
       }
 
@@ -129,9 +110,7 @@ export default function Home() {
          try {
             const { postId, content, imageUrl } = e?.detail || {}
             if (!postId) return
-
-            // 홈화면의 posts 상태에서 해당 게시글 업데이트
-            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, content, imageUrl } : post)))
+            updatePost(postId, { content, image_url: imageUrl })
          } catch (error) {
             console.error('게시글 수정 이벤트 처리 오류:', error)
          }
@@ -142,9 +121,7 @@ export default function Home() {
          try {
             const { postId } = e?.detail || {}
             if (!postId) return
-
-            // 홈화면의 posts 상태에서 해당 게시글 제거
-            setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId))
+            removePost(postId)
          } catch (error) {
             console.error('게시글 삭제 이벤트 처리 오류:', error)
          }
@@ -155,9 +132,7 @@ export default function Home() {
          try {
             const { postId, isChecked } = e?.detail || {}
             if (!postId) return
-
-            // 홈화면의 posts 상태에서 해당 게시글 체크 상태 업데이트
-            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked } : post)))
+            updatePost(postId, { is_read: isChecked })
          } catch (error) {
             console.error('게시글 체크 이벤트 처리 오류:', error)
          }
@@ -168,9 +143,7 @@ export default function Home() {
          try {
             const { postId, isBookmarked } = e?.detail || {}
             if (!postId) return
-
-            // 홈화면의 posts 상태에서 해당 게시글 책갈피 상태 업데이트
-            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked } : post)))
+            updatePost(postId, { is_bookmarked: isBookmarked })
          } catch (error) {
             console.error('게시글 책갈피 이벤트 처리 오류:', error)
          }
@@ -194,7 +167,7 @@ export default function Home() {
             window.removeEventListener('post:bookmarked', onPostBookmarked as EventListener)
          }
       }
-   }, [user]) // user가 변경될 때마다 useEffect 실행
+   }, [user, updatePost, removePost]) // user가 변경될 때마다 useEffect 실행
 
    const fetchConnections = async (userId: string) => {
       try {
@@ -220,108 +193,7 @@ export default function Home() {
    const handleFriendSelect = (friendId: string | null) => {
       console.log('👆 친구 선택:', { friendId, userNickname: user?.nickname })
       setSelectedFriend(friendId)
-      // 선택된 친구와의 피드 로드 (상대방과 내 게시글 함께)
-      if (friendId) {
-         fetchMyPostsWithFriend(friendId)
-      } else {
-         // 본인의 피드로 돌아가기
-         fetchPosts()
-      }
-   }
-
-   const fetchFriendPosts = async (friendId: string) => {
-      try {
-         // 선택된 친구와 본인의 게시글만 가져오기 (JWT 인증 사용)
-         const response = await fetch(`/api/posts?friendId=${friendId}`, {
-            credentials: 'include',
-         })
-         const result = await response.json()
-
-         if (result.success) {
-            // 체크/책갈피 상태도 함께 조회
-            const formattedPosts = await Promise.all(
-               result.posts.map(async (post: any) => {
-                  // 체크 상태 조회
-                  let isChecked = false
-                  try {
-                     const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                        credentials: 'include',
-                     })
-                     const checkResult = await checkResponse.json()
-                     if (checkResult.success) {
-                        isChecked = checkResult.isChecked
-                     }
-                  } catch (error) {
-                     console.error('체크 상태 조회 오류:', error)
-                  }
-
-                  // 책갈피 상태 조회
-                  let isBookmarked = false
-                  try {
-                     const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                        credentials: 'include',
-                     })
-                     const bookmarkResult = await bookmarkResponse.json()
-                     if (bookmarkResult.success) {
-                        isBookmarked = bookmarkResult.isBookmarked
-                     }
-                  } catch (error) {
-                     console.error('책갈피 상태 조회 오류:', error)
-                  }
-
-                  return {
-                     id: post.id,
-                     title: post.nickname,
-                     content: post.content,
-                     imageUrl: post.image_url || '',
-                     date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-                     time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-                     isChecked,
-                     isBookmarked,
-                  }
-               })
-            )
-
-            setPosts(formattedPosts)
-         }
-      } catch (error) {
-         console.error('친구 피드 조회 오류:', error)
-      }
-   }
-
-   // 특정 친구와의 피드에서 상대방과 내 게시글 모두 조회
-   const fetchMyPostsWithFriend = async (friendId: string) => {
-      try {
-         console.log('🔍 fetchMyPostsWithFriend 호출:', { userId: user?.nickname, friendId })
-         const response = await fetch(`/api/posts?userId=${user?.nickname}&friendId=${friendId}`)
-         console.log('📡 API 응답 상태:', response.status)
-         const result = await response.json()
-         console.log('📄 API 응답 데이터:', result)
-
-         if (result.success) {
-            // 상대방과 내 게시글 모두 가져오기 (필터 제거)
-            const allPosts = result.posts
-            console.log('📝 가져온 게시글 수:', allPosts.length)
-
-            // 체크/책갈피 상태도 함께 조회
-            const formattedPosts = allPosts.map((post: any) => {
-               return {
-                  id: post.id,
-                  title: post.nickname,
-                  content: post.content,
-                  imageUrl: post.image_url || '',
-                  date: new Date(post.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-                  time: new Date(post.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-                  isChecked: post.is_read || false,
-                  isBookmarked: false, // 책갈피 기능은 아직 구현되지 않음
-               }
-            })
-
-            setPosts(formattedPosts)
-         }
-      } catch (error) {
-         console.error('내가쓴글(친구별) 조회 오류:', error)
-      }
+      // SWR이 selectedFriend 변경을 감지하여 자동으로 데이터를 가져옴
    }
 
    const handleCreatePost = async (postData: { content: string; imageFile: File | null; selectedFriendId?: string }) => {
@@ -385,12 +257,12 @@ export default function Home() {
             if (postData.selectedFriendId) {
                // 친구와의 피드에 작성한 경우 해당 피드로 이동
                setSelectedFriend(postData.selectedFriendId)
-               fetchMyPostsWithFriend(postData.selectedFriendId)
             } else {
                // 본인 피드에 작성한 경우 본인 피드로 이동
                setSelectedFriend(null)
-               fetchPosts()
             }
+            // SWR 캐시 새로고침
+            refreshPosts()
          } else {
             console.error('포스트 생성 실패:', result.error)
          }
@@ -455,12 +327,8 @@ export default function Home() {
 
          if (result.success) {
             console.log('포스트 수정 성공!')
-            // 성공 시 포스트 목록 새로고침 (현재 선택된 친구 유지)
-            if (selectedFriend) {
-               fetchMyPostsWithFriend(selectedFriend)
-            } else {
-               fetchPosts()
-            }
+            // SWR 캐시 새로고침
+            refreshPosts()
          } else {
             console.error('포스트 수정 실패:', result.error)
          }
@@ -491,6 +359,16 @@ export default function Home() {
       setSelectedPostForComment(null)
    }
 
+   const handleImageClick = (imageUrl: string) => {
+      setSelectedImageUrl(imageUrl)
+      setIsImageViewerOpen(true)
+   }
+
+   const handleCloseImageViewer = () => {
+      setIsImageViewerOpen(false)
+      setSelectedImageUrl('')
+   }
+
    const handleCheckPost = async (postId: number) => {
       try {
          console.log('=== 포스트 체크/해제 시작 ===')
@@ -508,15 +386,9 @@ export default function Home() {
          if (result.success) {
             console.log('포스트 체크/해제 성공!', result.action)
 
-            // 체크 상태에 따라 게시글 상태 업데이트
+            // 체크 상태에 따라 게시글 상태 업데이트 (낙관적 업데이트)
             const newCheckedState = result.action === 'checked'
-
-            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked: newCheckedState } : post)))
-
-            // 선택된 친구의 게시글도 업데이트
-            if (selectedFriend) {
-               setFriendPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isChecked: newCheckedState } : post)))
-            }
+            updatePost(postId, { is_read: newCheckedState })
 
             // 다른 모달에 체크 상태 변경 이벤트 전송
             if (typeof window !== 'undefined') {
@@ -556,15 +428,12 @@ export default function Home() {
          if (result.success) {
             console.log('포스트 책갈피/해제 성공!', result.action)
 
-            // 책갈피 상태에 따라 게시글 상태 업데이트
+            // 책갈피 상태에 따라 게시글 상태 업데이트 (낙관적 업데이트)
             const newBookmarkedState = result.action === 'bookmarked'
+            updatePost(postId, { is_bookmarked: newBookmarkedState })
 
-            setPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked: newBookmarkedState } : post)))
-
-            // 선택된 친구의 게시글도 업데이트
-            if (selectedFriend) {
-               setFriendPosts((prevPosts) => prevPosts.map((post) => (post.id === postId ? { ...post, isBookmarked: newBookmarkedState } : post)))
-            }
+            // 책갈피된 게시물 정보 찾기 (책갈피 모달에서 사용)
+            const targetPost = posts.find((p) => p.id === postId)
 
             // 다른 모달에 책갈피 상태 변경 이벤트 전송
             if (typeof window !== 'undefined') {
@@ -573,6 +442,16 @@ export default function Home() {
                      detail: {
                         postId: postId,
                         isBookmarked: newBookmarkedState,
+                        // 책갈피 모달에서 새 게시물 추가에 필요한 정보
+                        post: targetPost
+                           ? {
+                                id: targetPost.id,
+                                content: targetPost.content,
+                                image_url: targetPost.imageUrl,
+                                created_at: new Date().toISOString(), // 대략적인 시간 (실제로는 원본 시간 필요)
+                                nickname: targetPost.title,
+                             }
+                           : null,
                      },
                   })
                )
@@ -614,12 +493,8 @@ export default function Home() {
 
          if (result.success) {
             console.log('포스트 삭제 성공!')
-            // 성공 시 포스트 목록 새로고침 (현재 보고 있는 피드에 맞게)
-            if (selectedFriend) {
-               fetchMyPostsWithFriend(selectedFriend)
-            } else {
-               fetchPosts()
-            }
+            // 로컬 상태에서 삭제 (낙관적 업데이트)
+            removePost(postId)
          } else {
             console.error('포스트 삭제 실패:', result.error)
             alert('포스트 삭제에 실패했습니다: ' + result.error)
@@ -757,7 +632,7 @@ export default function Home() {
                   <>
                      {/* 로그인된 상태일 때 기존 포스트 목록 표시 */}
                      <List>
-                        {posts.map((post) => (
+                        {displayedPosts.map((post) => (
                            <Card key={post.id}>
                               <CardHeader>
                                  <span>{post.title}</span>
@@ -766,11 +641,13 @@ export default function Home() {
                               </CardHeader>
                               {post.imageUrl ? (
                                  <CardImage
+                                    onClick={() => handleImageClick(post.imageUrl)}
                                     style={{
                                        backgroundImage: `url('${post.imageUrl}')`,
                                        backgroundSize: 'cover',
                                        backgroundPosition: 'center',
                                        backgroundRepeat: 'no-repeat',
+                                       cursor: 'pointer',
                                     }}
                                  />
                               ) : (
@@ -815,6 +692,12 @@ export default function Home() {
                               </CardActions>
                            </Card>
                         ))}
+                        {/* 무한스크롤 로더 */}
+                        {hasMore && (
+                           <LoaderWrapper ref={loaderRef}>
+                              <span>더 불러오는 중...</span>
+                           </LoaderWrapper>
+                        )}
                      </List>
                   </>
                )}
@@ -825,6 +708,8 @@ export default function Home() {
             <FriendAddModal isOpen={isFriendModalOpen} onClose={() => setIsFriendModalOpen(false)} onAddFriend={handleAddFriend} />
 
             <CommentModal isOpen={isCommentModalOpen} onClose={handleCloseCommentModal} postId={selectedPostForComment?.id || 0} postContent={selectedPostForComment?.content || ''} />
+
+            <ImageViewerModal isOpen={isImageViewerOpen} imageUrl={selectedImageUrl} onClose={handleCloseImageViewer} />
 
             {/* 로그인된 상태일 때만 글쓰기 버튼 표시 */}
             {user && (
@@ -984,6 +869,15 @@ const CardActions = styled.div`
    font-size: 13px;
    padding: 12px 16px 16px;
    color: #4b5563;
+`
+
+const LoaderWrapper = styled.div`
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   padding: 24px;
+   color: #6b7280;
+   font-size: 14px;
 `
 
 const Fab = styled.button`

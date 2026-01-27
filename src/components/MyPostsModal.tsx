@@ -117,7 +117,9 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                })
             )
 
-            setMyPosts(postsWithStatus)
+            // 최신순 정렬
+            const sortedPosts = postsWithStatus.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            setMyPosts(sortedPosts)
          }
       } catch (error) {
          console.error('내가쓴글 조회 오류:', error)
