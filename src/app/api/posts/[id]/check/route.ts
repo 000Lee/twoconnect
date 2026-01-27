@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/auth'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
    try {
+      // JWT에서 사용자 정보 추출
+      const user = getAuthUser(request)
+      if (!user) {
+         return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+      }
+
       const { id } = await params
       const postId = parseInt(id)
-
-      // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
-      const rawNickname = request.headers.get('x-user-nickname') || 'anonymous'
-      const userNickname = decodeURIComponent(rawNickname)
 
       // Supabase 클라이언트 생성
       const supabase = createServerSupabaseClient()
 
       // RLS를 위한 사용자 닉네임 설정
-      await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
+      await supabase.rpc('set_user_nickname', { p_nickname: user.nickname })
 
       // 현재 체크 상태 확인
       const { data: currentPost } = await supabase.from('posts').select('is_read').eq('id', postId).single()
@@ -45,13 +48,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
    try {
+      // JWT에서 사용자 정보 추출
+      const user = getAuthUser(request)
+      if (!user) {
+         return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+      }
+
       const { id } = await params
       const postId = parseInt(id)
-      const rawNickname = request.headers.get('x-user-nickname') || 'anonymous'
-      const userNickname = decodeURIComponent(rawNickname)
 
       const supabase = createServerSupabaseClient()
-      await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
+      await supabase.rpc('set_user_nickname', { p_nickname: user.nickname })
 
       // 게시글 체크 상태 조회
       const { data, error } = await supabase.from('posts').select('is_read').eq('id', postId).single()

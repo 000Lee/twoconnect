@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/auth'
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const connectionId = id
-
-    // 쿠키에서 user_id (UUID) 가져오기
-    const userId = request.cookies.get('user_id')?.value
-
-    if (!userId) {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
       return NextResponse.json(
         { success: false, error: '로그인이 필요합니다.' },
         { status: 401 }
       )
     }
+
+    const { id } = await params
+    const connectionId = id
+    const userId = user.id
 
     const supabase = createServerSupabaseClient()
 

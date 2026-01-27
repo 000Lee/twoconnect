@@ -68,8 +68,10 @@ export default function Home() {
             return
          }
 
-         // 본인의 게시글만 가져오기
-         const response = await fetch(`/api/posts?userId=${user.nickname}`)
+         // 본인의 게시글만 가져오기 (JWT 인증 사용)
+         const response = await fetch('/api/posts', {
+            credentials: 'include',
+         })
          const result = await response.json()
 
          if (result.success) {
@@ -229,8 +231,10 @@ export default function Home() {
 
    const fetchFriendPosts = async (friendId: string) => {
       try {
-         // 선택된 친구와 본인의 게시글만 가져오기
-         const response = await fetch(`/api/posts?userId=${user?.nickname}&friendId=${friendId}`)
+         // 선택된 친구와 본인의 게시글만 가져오기 (JWT 인증 사용)
+         const response = await fetch(`/api/posts?friendId=${friendId}`, {
+            credentials: 'include',
+         })
          const result = await response.json()
 
          if (result.success) {
@@ -241,9 +245,7 @@ export default function Home() {
                   let isChecked = false
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                        headers: {
-                           'x-user-nickname': encodeURIComponent(user?.nickname || ''),
-                        },
+                        credentials: 'include',
                      })
                      const checkResult = await checkResponse.json()
                      if (checkResult.success) {
@@ -257,9 +259,7 @@ export default function Home() {
                   let isBookmarked = false
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                        headers: {
-                           'x-user-nickname': encodeURIComponent(user?.nickname || ''),
-                        },
+                        credentials: 'include',
                      })
                      const bookmarkResult = await bookmarkResponse.json()
                      if (bookmarkResult.success) {
@@ -371,9 +371,8 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': encodeURIComponent(user?.nickname || ''),
-               'x-user-id': user?.id || '',
             },
+            credentials: 'include',
             body: JSON.stringify(requestBody),
          })
 
@@ -446,8 +445,8 @@ export default function Home() {
             method: 'PUT',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': user?.id || '',
             },
+            credentials: 'include',
             body: JSON.stringify(requestBody),
          })
 
@@ -497,8 +496,8 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': encodeURIComponent(user?.nickname || ''),
             },
+            credentials: 'include',
          })
 
          const result = await response.json()
@@ -545,8 +544,8 @@ export default function Home() {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': encodeURIComponent(user?.nickname || ''),
             },
+            credentials: 'include',
          })
 
          const result = await response.json()
@@ -602,8 +601,8 @@ export default function Home() {
             method: 'DELETE',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': user?.id || '',
             },
+            credentials: 'include',
          })
 
          const result = await response.json()

@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/auth'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const commentId = id
-    const { content } = await request.json()
-    const rawNickname = request.headers.get('x-user-nickname')
-    const userNickname = rawNickname ? decodeURIComponent(rawNickname) : null
-
-    if (!userNickname) {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
       return NextResponse.json(
         { success: false, error: '로그인이 필요합니다.' },
         { status: 401 }
       )
     }
+
+    const { id } = await params
+    const commentId = id
+    const { content } = await request.json()
 
     if (!content || !content.trim()) {
       return NextResponse.json(
@@ -43,7 +44,7 @@ export async function PUT(
     }
 
     // 본인이 작성한 댓글만 수정 가능
-    if (comment.nickname !== userNickname) {
+    if (comment.nickname !== user.nickname) {
       return NextResponse.json(
         { success: false, error: '댓글을 수정할 권한이 없습니다.' },
         { status: 403 }
@@ -80,17 +81,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const commentId = id
-    const rawNickname = request.headers.get('x-user-nickname')
-    const userNickname = rawNickname ? decodeURIComponent(rawNickname) : null
-
-    if (!userNickname) {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
       return NextResponse.json(
         { success: false, error: '로그인이 필요합니다.' },
         { status: 401 }
       )
     }
+
+    const { id } = await params
+    const commentId = id
 
     const supabase = createServerSupabaseClient()
 
@@ -109,7 +110,7 @@ export async function DELETE(
     }
 
     // 본인이 작성한 댓글만 삭제 가능
-    if (comment.nickname !== userNickname) {
+    if (comment.nickname !== user.nickname) {
       return NextResponse.json(
         { success: false, error: '댓글을 삭제할 권한이 없습니다.' },
         { status: 403 }

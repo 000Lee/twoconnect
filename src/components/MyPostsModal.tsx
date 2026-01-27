@@ -87,9 +87,6 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
                         credentials: 'include',
-                        headers: {
-                           'x-user-nickname': encodeURIComponent(user.nickname),
-                        },
                      })
                      const checkResult = await checkResponse.json()
                      if (checkResult.success) {
@@ -103,9 +100,6 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
                         credentials: 'include',
-                        headers: {
-                           'x-user-nickname': encodeURIComponent(user.nickname),
-                        },
                      })
                      const bookmarkResult = await bookmarkResponse.json()
                      if (bookmarkResult.success) {
@@ -149,6 +143,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             headers: {
                'Content-Type': 'application/json',
             },
+            credentials: 'include',
          })
 
          const result = await response.json()
@@ -192,6 +187,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             headers: {
                'Content-Type': 'application/json',
             },
+            credentials: 'include',
          })
 
          const result = await response.json()
@@ -252,7 +248,7 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
          console.log('API 요청 데이터:', {
             url: `/api/posts/${updatedPost.id}`,
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+            headers: { 'Content-Type': 'application/json' },
             body: {
                content: updatedPost.content,
                imageFile: updatedPost.imageUrl ? { data: updatedPost.imageUrl } : null,
@@ -263,8 +259,8 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             method: 'PUT',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userId,
             },
+            credentials: 'include',
             body: JSON.stringify({
                content: updatedPost.content,
                imageFile: updatedPost.imageUrl ? { data: updatedPost.imageUrl } : null,
@@ -351,19 +347,17 @@ export default function MyPostsModal({ isOpen, onClose }: MyPostsModalProps) {
             return
          }
 
-         const userNickname = localStorage.getItem('user_nickname')
-         const userId = localStorage.getItem('user_id')
-         if (!userNickname || !userId) return
+         if (!user) return
 
-         console.log('삭제 요청 사용자 ID:', userId)
+         console.log('삭제 요청 사용자 ID:', user.id)
 
          // API 호출하여 포스트 삭제
          const response = await fetch(`/api/posts/${postId}`, {
             method: 'DELETE',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': userId,
             },
+            credentials: 'include',
          })
 
          const result = await response.json()

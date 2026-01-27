@@ -1,30 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/auth'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
+      return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
     const { id } = await params
     const postId = parseInt(id)
-    
-    // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
-    const rawNickname = request.headers.get('x-user-nickname') || 'anonymous'
-    const userNickname = decodeURIComponent(rawNickname)
 
     // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient()
 
     // RLS를 위한 사용자 닉네임 설정
-    await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
+    await supabase.rpc('set_user_nickname', { p_nickname: user.nickname })
 
     // 현재 책갈피 상태 확인
     const { data: currentBookmark } = await supabase
       .from('post_bookmarks')
       .select('*')
       .eq('post_id', postId)
-      .eq('bookmarker_nickname', userNickname)
+      .eq('bookmarker_nickname', user.nickname)
       .single()
 
     if (currentBookmark) {
@@ -33,7 +36,7 @@ export async function POST(
         .from('post_bookmarks')
         .delete()
         .eq('post_id', postId)
-        .eq('bookmarker_nickname', userNickname)
+        .eq('bookmarker_nickname', user.nickname)
 
       if (error) {
         console.error('Post unbookmark error:', error)
@@ -43,8 +46,8 @@ export async function POST(
         )
       }
 
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: '게시글 책갈피가 해제되었습니다.',
         action: 'unbookmarked'
       })
@@ -54,7 +57,7 @@ export async function POST(
         .from('post_bookmarks')
         .insert({
           post_id: postId,
-          bookmarker_nickname: userNickname,
+          bookmarker_nickname: user.nickname,
           bookmarked_at: new Date().toISOString()
         })
 
@@ -66,8 +69,8 @@ export async function POST(
         )
       }
 
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: '게시글이 책갈피되었습니다.',
         action: 'bookmarked'
       })
@@ -86,20 +89,24 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
+      return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
     const { id } = await params
     const postId = parseInt(id)
-    const rawNickname = request.headers.get('x-user-nickname') || 'anonymous'
-    const userNickname = decodeURIComponent(rawNickname)
 
     const supabase = createServerSupabaseClient()
-    await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
+    await supabase.rpc('set_user_nickname', { p_nickname: user.nickname })
 
     // 게시글 책갈피 상태 조회
     const { data, error } = await supabase
       .from('post_bookmarks')
       .select('*')
       .eq('post_id', postId)
-      .eq('bookmarker_nickname', userNickname)
+      .eq('bookmarker_nickname', user.nickname)
       .single()
 
     if (error && error.code !== 'PGRST116') { // PGRST116는 결과가 없는 경우
@@ -110,9 +117,9 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      isBookmarked: !!data 
+    return NextResponse.json({
+      success: true,
+      isBookmarked: !!data
     })
   } catch (error) {
     console.error('Post bookmark status API error:', error)

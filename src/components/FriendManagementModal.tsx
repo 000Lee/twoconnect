@@ -63,8 +63,8 @@ export default function FriendManagementModal({ isOpen, onClose, userNickname }:
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-nickname': encodeURIComponent(userNickname)
-        }
+        },
+        credentials: 'include',
       })
 
       const result = await response.json()

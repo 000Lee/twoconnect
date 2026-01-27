@@ -160,9 +160,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                   let isChecked = false
                   try {
                      const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                        headers: {
-                           'x-user-nickname': encodeURIComponent(user.nickname),
-                        },
+                        credentials: 'include',
                      })
                      const checkResult = await checkResponse.json()
                      if (checkResult.success) {
@@ -176,9 +174,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
                   let isBookmarked = false
                   try {
                      const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                        headers: {
-                           'x-user-nickname': encodeURIComponent(user.nickname),
-                        },
+                        credentials: 'include',
                      })
                      const bookmarkResult = await bookmarkResponse.json()
                      if (bookmarkResult.success) {
@@ -221,8 +217,8 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': encodeURIComponent(user.nickname),
             },
+            credentials: 'include',
          })
 
          const result = await response.json()
@@ -266,8 +262,8 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-nickname': encodeURIComponent(user.nickname),
             },
+            credentials: 'include',
          })
 
          const result = await response.json()
@@ -334,8 +330,8 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             method: 'PUT',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': user.id,
             },
+            credentials: 'include',
             body: JSON.stringify({
                content: updatedPost.content,
                imageFile: updatedPost.imageUrl ? { data: updatedPost.imageUrl } : null,
@@ -377,7 +373,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                               try {
                                  const checkResponse = await fetch(`/api/posts/${post.id}/check`, {
-                                    headers: { 'x-user-nickname': encodeURIComponent(user.nickname) },
+                                    credentials: 'include',
                                  })
                                  const checkResult = await checkResponse.json()
                                  if (checkResult.success) isChecked = checkResult.isChecked
@@ -387,7 +383,7 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
 
                               try {
                                  const bookmarkResponse = await fetch(`/api/posts/${post.id}/bookmark`, {
-                                    headers: { 'x-user-nickname': encodeURIComponent(user.nickname) },
+                                    credentials: 'include',
                                  })
                                  const bookmarkResult = await bookmarkResponse.json()
                                  if (bookmarkResult.success) isBookmarked = bookmarkResult.isBookmarked
@@ -444,8 +440,8 @@ export default function BookmarkModal({ isOpen, onClose }: BookmarkModalProps) {
             method: 'DELETE',
             headers: {
                'Content-Type': 'application/json',
-               'x-user-id': user.id,
             },
+            credentials: 'include',
          })
 
          const result = await response.json()

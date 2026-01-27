@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
    try {
+      // JWT에서 사용자 정보 추출
+      const user = getAuthUser(request)
+      if (!user) {
+         return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+      }
+
       const { content, imageFile, selectedFriendId } = await request.json()
 
       // 입력 검증
@@ -10,16 +17,11 @@ export async function POST(request: NextRequest) {
          return NextResponse.json({ success: false, error: '내용을 입력해주세요.' }, { status: 400 })
       }
 
-      // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
-      const rawNickname = request.headers.get('x-user-nickname') || '익명'
-      const userNickname = decodeURIComponent(rawNickname)
-      const userId = request.headers.get('x-user-id') || 'anonymous'
-
       // Supabase 클라이언트 생성
       const supabase = createServerSupabaseClient()
 
       // RLS를 위한 사용자 닉네임 설정
-      await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
+      await supabase.rpc('set_user_nickname', { p_nickname: user.nickname })
 
       // 이미지 파일이 있으면 처리
       let imageUrl = null
@@ -52,8 +54,8 @@ export async function POST(request: NextRequest) {
 
       // 포스트 생성 함수 호출
       const { data, error } = await supabase.rpc('create_post', {
-         p_user_id: userId,
-         p_nickname: userNickname,
+         p_user_id: user.id,
+         p_nickname: user.nickname,
          p_content: content.trim(),
          p_image_url: imageUrl,
          p_friend_id: selectedFriendId || null,
@@ -77,57 +79,43 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
    try {
+      // JWT에서 사용자 정보 추출
+      const user = getAuthUser(request)
+
       const { searchParams } = new URL(request.url)
-      const userId = searchParams.get('userId')
       const friendId = searchParams.get('friendId')
 
-      console.log('🔍 Posts API 호출:', { userId, friendId })
+      console.log('🔍 Posts API 호출:', { userId: user?.id, nickname: user?.nickname, friendId })
+
+      // 로그인하지 않은 경우 빈 배열 반환
+      if (!user) {
+         return NextResponse.json({ success: true, posts: [] })
+      }
 
       const supabase = createServerSupabaseClient()
 
-      // userId는 클라이언트에서 닉네임을 전달하고 있음
-      const userNickname = userId || null
-
       // RLS를 위한 사용자 닉네임 설정
-      if (userNickname) {
-         await supabase.rpc('set_user_nickname', { p_nickname: userNickname })
-      }
+      await supabase.rpc('set_user_nickname', { p_nickname: user.nickname })
 
       let posts
       let error
 
       if (friendId) {
-         // 현재 사용자 UUID 조회
-         let userUuid: string | null = null
-         if (userNickname) {
-            const { data: me, error: meErr } = await supabase.from('users').select('id').eq('nickname', userNickname).single()
-            if (meErr || !me) {
-               return NextResponse.json({ success: false, error: '사용자 정보를 찾을 수 없습니다.' }, { status: 404 })
-            }
-            userUuid = me.id
-         }
-
-         // friendId는 UUID로 전달됨
-         const friendUuid = friendId
-
          // RPC 함수로 1:1 피드 조회
          const { data, error: qErr } = await supabase.rpc('get_connected_posts', {
-            p_user_uuid: userUuid,
-            p_friend_uuid: friendUuid,
+            p_user_uuid: user.id,
+            p_friend_uuid: friendId,
          })
 
          posts = data as any
          error = qErr as any
-      } else if (userId) {
-         // 본인의 게시글만 가져오기 (userId는 실제로 닉네임)
+      } else {
+         // 본인의 게시글만 가져오기
          const { data, error: userError } = await supabase.rpc('get_user_posts', {
-            p_nickname: userId,
+            p_nickname: user.nickname,
          })
          posts = data
          error = userError
-      } else {
-         // 파라미터가 없는 경우 빈 배열 반환
-         return NextResponse.json({ success: true, posts: [] })
       }
 
       if (error) {

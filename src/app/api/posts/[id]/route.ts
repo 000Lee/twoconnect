@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/auth'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
+      return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
     const { id } = await params
     const postId = parseInt(id)
     const { content, imageFile } = await request.json()
@@ -18,8 +25,7 @@ export async function PUT(
       )
     }
 
-    // localStorage에서 사용자 정보 가져오기 (실제로는 JWT 토큰 사용 권장)
-    const userId = request.headers.get('x-user-id') || 'anonymous'
+    const userId = user.id
 
     // Supabase 클라이언트 생성
     const supabase = createServerSupabaseClient()
@@ -91,9 +97,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // JWT에서 사용자 정보 추출
+    const user = getAuthUser(request)
+    if (!user) {
+      return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
     const { id } = await params
     const postId = parseInt(id)
-    const userId = request.headers.get('x-user-id') || 'anonymous'
+    const userId = user.id
 
     console.log('포스트 삭제 요청:', { postId, userId })
 
