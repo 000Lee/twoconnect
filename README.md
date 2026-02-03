@@ -116,18 +116,26 @@ twoconnect/
 │ created_at  │     │ created_at       │
 └─────────────┘     └──────────────────┘
        │
-       │
-       ▼
-┌─────────────┐     ┌──────────────────┐
-│    posts    │────<│   post_checks    │
-│             │     │                  │
-├─────────────┤     ├──────────────────┤
-│ id (PK)     │     │ id (PK)          │
-│ user_id (FK)│     │ user_id (FK)     │
-│ nickname    │     │ post_id (FK)     │
-│ content     │     │ checked          │
-│ image_url   │     │ checked_at       │
-│ created_at  │     └──────────────────┘
+       ├──────────────────┬──────────────────┐
+       ▼                  ▼                  ▼
+┌─────────────┐    ┌─────────────┐    ┌──────────────────┐
+│    posts    │    │  comments   │    │  post_bookmarks  │
+├─────────────┤    ├─────────────┤    ├──────────────────┤
+│ id (PK)     │    │ id (PK)     │    │ id (PK)          │
+│ user_id (FK)│    │ user_id (FK)│    │ user_id (FK)     │
+│ nickname    │    │ post_id (FK)│    │ post_id (FK)     │
+│ content     │    │ content     │    │ created_at       │
+│ image_url   │    │ created_at  │    └──────────────────┘
+│ created_at  │    └─────────────┘
+└─────────────┘
+
+┌─────────────┐
+│   notices   │
+├─────────────┤
+│ id (PK)     │
+│ title       │
+│ content     │
+│ created_at  │
 └─────────────┘
 ```
 
@@ -138,17 +146,19 @@ twoconnect/
 | `users` | 사용자 정보 (이메일, 닉네임, 암호화된 비밀번호) |
 | `posts` | 게시물 정보 (작성자, 내용, 이미지 URL) |
 | `connections` | 친구 관계 (요청자, 수신자, 연결 상태) |
-| `post_checks` | 게시물 읽음 체크 (사용자별 게시물 확인 상태) |
+| `comments` | 댓글 정보 (작성자, 게시물, 내용) |
+| `post_bookmarks` | 게시물 책갈피 (사용자별 저장한 게시물) |
+| `notices` | 공지사항 (관리자 작성 공지) |
 
 ### 보안 정책 (Row Level Security)
 
 ```sql
--- 사용자는 자신의 체크 기록만 조회/수정/삭제 가능
-CREATE POLICY "Users can view their own post checks" ON public.post_checks
+-- 사용자는 자신의 책갈피만 조회/관리 가능
+CREATE POLICY "Users can view their own post bookmarks" ON public.post_bookmarks
     FOR SELECT USING (auth.uid()::text = user_id::text);
 
-CREATE POLICY "Users can insert their own post checks" ON public.post_checks
-    FOR INSERT WITH CHECK (auth.uid()::text = user_id::text);
+CREATE POLICY "Users can insert/delete their own post bookmarks" ON public.post_bookmarks
+    FOR ALL USING (auth.uid()::text = user_id::text);
 ```
 
 ---
