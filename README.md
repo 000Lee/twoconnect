@@ -152,14 +152,28 @@ twoconnect/
 
 ### 보안 정책 (Row Level Security)
 
-```sql
--- 사용자는 자신의 책갈피만 조회/관리 가능
-CREATE POLICY "Users can view their own post bookmarks" ON public.post_bookmarks
-    FOR SELECT USING (auth.uid()::text = user_id::text);
+모든 테이블에 RLS를 적용하여 데이터베이스 레벨에서 접근 제어를 구현하였습니다.
 
-CREATE POLICY "Users can insert/delete their own post bookmarks" ON public.post_bookmarks
-    FOR ALL USING (auth.uid()::text = user_id::text);
-```
+| 테이블 | 정책명 | 권한 | 설명 |
+|--------|--------|------|------|
+| `users` | Users can insert during signup | INSERT | 회원가입 시 사용자 생성 허용 |
+| `users` | Users can view own profile (JWT) | SELECT | 본인 프로필만 조회 가능 |
+| `users` | Users can update own profile (JWT) | UPDATE | 본인 프로필만 수정 가능 |
+| `posts` | Users can view their own and connected posts | SELECT | 본인 및 친구 게시물만 조회 |
+| `posts` | Authenticated users can create posts | INSERT | 인증된 사용자만 작성 가능 |
+| `posts` | Users can update their own posts | UPDATE | 본인 게시물만 수정 가능 |
+| `posts` | Users can delete their own posts | DELETE | 본인 게시물만 삭제 가능 |
+| `comments` | Allow public read access | SELECT | 댓글 공개 조회 |
+| `comments` | Allow authenticated users to insert | INSERT | 인증된 사용자만 작성 가능 |
+| `comments` | Allow users to delete own comments | DELETE | 본인 댓글만 삭제 가능 |
+| `connections` | Users can view their own connections | SELECT | 본인 연결만 조회 가능 |
+| `connections` | Users can manage their own connections | ALL | 본인 연결만 관리 가능 |
+| `post_bookmarks` | Users can view their own post bookmarks | SELECT | 본인 책갈피만 조회 가능 |
+| `post_bookmarks` | Users can insert/delete their own post bookmarks | ALL | 본인 책갈피만 관리 가능 |
+| `notices` | 공지사항 조회 허용 | SELECT | 모든 사용자 조회 가능 |
+| `notices` | Admin만 공지사항 생성 (JWT) | INSERT | 관리자만 작성 가능 |
+| `notices` | Admin만 공지사항 수정 (JWT) | UPDATE | 관리자만 수정 가능 |
+| `notices` | Admin만 공지사항 삭제 (JWT) | DELETE | 관리자만 삭제 가능 |
 
 ---
 
