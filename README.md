@@ -18,7 +18,7 @@ TwoConnect는 불특정 다수가 보는 기존 SNS의 부담감에서 벗어나
 ---
 ## 🔗 배포 링크
 
-**[Live Demo](https://time-and-attendance-lyart.vercel.app)**
+**[Live Demo](https://twoconnect.vercel.app/)**
 ---
 ## 🛠 기술 스택
 
