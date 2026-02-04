@@ -16,7 +16,10 @@ TwoConnect는 불특정 다수가 보는 기존 SNS의 부담감에서 벗어나
 - **읽음 확인 시스템**: 게시물 체크 기능으로 소통 상태 파악
 
 ---
+## 🔗 배포 링크
 
+**[Live Demo](https://time-and-attendance-lyart.vercel.app)**
+---
 ## 🛠 기술 스택
 
 ### Frontend
